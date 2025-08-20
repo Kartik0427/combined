@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { User, DollarSign, MessageSquare, Mail, Star, LogOut, Phone, Video, RefreshCw, Scale, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
 
@@ -34,21 +34,24 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
 
   const toggleService = async (service) => {
     const newState = !services[service];
+    // Optimistically update local state
     setServices(prev => ({ ...prev, [service]: newState }));
-  const maxValue = Math.max(...analyticsData[analyticsView]);
 
-  try {
-    const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
-    await updateDoc(lawyerRef, {
-      [`availability.${service}`]: newState,
-      lastActive: new Date()
-    });
-  } catch (error) {
-    console.error('Error updating availability:', error);
+    try {
+      const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
+      await updateDoc(lawyerRef, {
+        [`availability.${service}`]: newState,
+        lastActive: serverTimestamp(),
+        isOnline: true
+      });
 
-    setServices(prev => ({ ...prev, [service]: !newState }));
-  }
-};
+      console.log(`${service} availability updated to:`, newState);
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      // Revert the optimistic update on error
+      setServices(prev => ({ ...prev, [service]: !newState }));
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#22223B] via-[#4A4E69] to-[#9A8C98] p-6">

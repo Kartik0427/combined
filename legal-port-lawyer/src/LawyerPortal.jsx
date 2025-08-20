@@ -72,6 +72,10 @@ const LawyerPortal = ({ onLogout }) => {
         />
       )}
       {renderPage()}
+      )}
+      {currentPage === 'requests' && (
+        <RequestsPage user={user} setCurrentPage={setCurrentPage} />
+      )}
     </div>
   );
 };
