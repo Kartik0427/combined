@@ -12,7 +12,7 @@ const SettingsPage = ({ setCurrentPage }) => {
     chat: false
   });
   const [isOnline, setIsOnline] = useState(false);
-  const [lawyerId, setLawyerId] = useState(null);
+  const [lawyerId, setLawyerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

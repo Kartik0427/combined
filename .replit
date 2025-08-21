@@ -17,6 +17,10 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
+args = "cd legal-port && npm i"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
 args = "cd legal-port && npm start"
 
 [[workflows.workflow]]
@@ -30,7 +34,7 @@ args = "cd legal-port-lawyer && npm i "
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd legal-port-lawyer && npm run dev"
+args = "cd legal-port-lawyer && npm start"
 
 [[workflows.workflow]]
 name = "Run Both Apps"
