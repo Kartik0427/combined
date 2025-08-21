@@ -24,8 +24,8 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
           setProfile(data);
           // Initialize services state from fetched data
           setServices({
-            videoCall: data.availability?.videoCall || false,
-            audioCall: data.availability?.audioCall || false,
+            videoCall: data.availability?.video || false,
+            audioCall: data.availability?.audio || false,
             chat: data.availability?.chat || false,
           });
         } else {
@@ -49,11 +49,17 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
   }, [user.uid, user.name, user.specialization]);
 
   const toggleService = async (service) => {
+    const fieldMapping = {
+      videoCall: 'video',
+      audioCall: 'audio',
+      chat: 'chat'
+    };
+    
     setServices(prev => ({ ...prev, [service]: !prev[service] }));
     try {
       const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
       await updateDoc(lawyerRef, {
-        [`availability.${service}`]: !services[service],
+        [`availability.${fieldMapping[service]}`]: !services[service],
         lastActive: serverTimestamp(),
         isOnline: true // Assuming toggling a service means the lawyer is online
       });
@@ -92,7 +98,7 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
                 <p className="text-white/70 text-sm">Welcome</p>
                 <h2 className="text-2xl font-bold text-white">{profile?.name || user.name}</h2>
                 <p className="text-white/80 mb-2">
-                  {Array.isArray(profile?.specializations) ? profile.specializations.join(", ") : user.specialization}
+                  {profile?.specialization || user.specialization}
                 </p>
               </div>
             </div>

@@ -157,32 +157,36 @@ export const subscribeLawyers = (callback: (lawyers: Lawyer[]) => void) => {
         // Get the proper image URL
         const imageUrl = await getImageUrl(data.image || '');
 
-      return {
-        id: doc.id,
-        name: data.name || '',
-        specializations,
-        rating: data.rating || 0,
-        reviews: data.reviews || 0,
-        experience: data.experience || 0,
-        isOnline: data.isOnline || false,
-        pricing: {
-          audio: data.pricing?.audio || 0,
-          video: data.pricing?.video || 0,
-          chat: data.pricing?.chat || 0,
-        },
-        image: imageUrl,
-        connections: data.connections || 0,
-        verified: data.verified || false,
-        availability: {
-          audio: data.availability?.audio || false,
-          video: data.availability?.video || false,
-          chat: data.availability?.chat || false,
-        },
-        lastActive: data.lastActive?.toDate() || new Date(),
-      };
-    });
+        return {
+          id: doc.id,
+          name: data.name || '',
+          specializations,
+          rating: data.rating || 0,
+          reviews: data.reviews || 0,
+          experience: data.experience || 0,
+          isOnline: data.isOnline || false,
+          pricing: {
+            audio: data.pricing?.audio || 0,
+            video: data.pricing?.video || 0,
+            chat: data.pricing?.chat || 0,
+          },
+          image: imageUrl,
+          connections: data.connections || 0,
+          verified: data.verified || false,
+          availability: {
+            audio: data.availability?.audio || false,
+            video: data.availability?.video || false,
+            chat: data.availability?.chat || false,
+          },
+          lastActive: data.lastActive?.toDate() || new Date(),
+        };
+      });
 
-    const lawyers = await Promise.all(lawyerPromises);
-    callback(lawyers);
+      const lawyers = await Promise.all(lawyerPromises);
+      callback(lawyers);
+    } catch (error) {
+      console.error('Error in subscribeLawyers:', error);
+      callback([]);
+    }
   });
 };
