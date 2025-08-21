@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { User, DollarSign, MessageSquare, Mail, Star, LogOut, Phone, Video, RefreshCw, Scale, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
+import { User, DollarSign, MessageSquare, Mail, Star, LogOut, Phone, Video, RefreshCw, Scale, TrendingUp, Calendar, BarChart3, Settings, Inbox } from 'lucide-react';
 
 const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
   const [services, setServices] = useState({
@@ -175,6 +175,18 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
               <Star className="w-6 h-6" />
             </div>
             <span className="text-white font-medium text-sm text-center">Reviews</span>
+          </button>
+          <button onClick={() => setCurrentPage('settings')} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/20 transition-all duration-300 flex flex-col items-center gap-3 group">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#4A4E69] to-[#9A8C98] text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Settings className="w-6 h-6" />
+            </div>
+            <span className="text-white font-medium text-sm text-center">Settings</span>
+          </button>
+          <button onClick={() => setCurrentPage('requests')} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/20 transition-all duration-300 flex flex-col items-center gap-3 group">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#10B981] to-[#059669] text-white flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Inbox className="w-6 h-6" />
+            </div>
+            <span className="text-white font-medium text-sm text-center">Requests</span>
           </button>
           <button onClick={handleLogout} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-2xl hover:bg-white/20 transition-all duration-300 flex flex-col items-center gap-3 group">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#22223B] to-[#4A4E69] text-white flex items-center justify-center group-hover:scale-110 transition-transform">
