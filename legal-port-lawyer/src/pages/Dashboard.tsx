@@ -144,7 +144,9 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
                     Welcome back, {user.name}
                   </h1>
                   <p className="text-sm text-gray-500">
-                    {lawyerData?.specializations?.join(', ') || user.specialization}
+                    {Array.isArray(lawyerData?.specializations) 
+                      ? lawyerData.specializations.join(', ') 
+                      : user.specialization}
                   </p>
                 </div>
               </div>

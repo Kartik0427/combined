@@ -45,12 +45,6 @@ const LawyerPortal = ({ onLogout }) => {
       setLoading(false);
     });
 
-    // Check if user is already logged in on mount
-    if (auth.currentUser) {
-      setAuthUser(auth.currentUser);
-      setLoading(false);
-    }
-
     return () => unsubscribe();
   }, []);
 
