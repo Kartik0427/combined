@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, updateDoc, onSnapshot, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { User, DollarSign, MessageSquare, Mail, Star, LogOut, Phone, Video, RefreshCw, Scale, TrendingUp, Calendar, BarChart3, Settings, Inbox } from 'lucide-react';
 
@@ -11,7 +11,12 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
   });
   const [incomingCall, setIncomingCall] = useState(false);
   const [analyticsView, setAnalyticsView] = useState('week');
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState({
+    name: user.name,
+    specialization: user.specialization,
+    cases: 0,
+    rating: 0
+  });
 
   useEffect(() => {
     const fetchLawyerProfile = async () => {
@@ -21,22 +26,21 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setProfile(data);
+          setProfile({
+            name: data.name || user.name,
+            specialization: data.specialization || user.specialization,
+            cases: data.cases || 0,
+            rating: data.rating || 0
+          });
           // Initialize services state from fetched data
           setServices({
             videoCall: data.availability?.video || false,
             audioCall: data.availability?.audio || false,
             chat: data.availability?.chat || false,
           });
-        } else {
-          console.log("No such document!");
-          // If no profile exists, use initial state or default values
-          setProfile({ name: user.name, specialization: user.specialization, cases: 0, rating: 0 });
         }
       } catch (error) {
         console.error("Error fetching lawyer profile:", error);
-        // Fallback to user data if fetching fails
-        setProfile({ name: user.name, specialization: user.specialization, cases: 0, rating: 0 });
       }
     };
 
@@ -55,19 +59,42 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
       chat: 'chat'
     };
     
-    setServices(prev => ({ ...prev, [service]: !prev[service] }));
+    const newValue = !services[service];
+    
     try {
       const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
-      await updateDoc(lawyerRef, {
-        [`availability.${fieldMapping[service]}`]: !services[service],
-        lastActive: serverTimestamp(),
-        isOnline: true // Assuming toggling a service means the lawyer is online
-      });
+      
+      // Check if document exists first
+      const docSnap = await getDoc(lawyerRef);
+      if (!docSnap.exists()) {
+        // Create document with basic profile data
+        await setDoc(lawyerRef, {
+          name: user.name,
+          specialization: user.specialization,
+          availability: {
+            video: service === 'videoCall' ? newValue : false,
+            audio: service === 'audioCall' ? newValue : false,
+            chat: service === 'chat' ? newValue : false
+          },
+          lastActive: serverTimestamp(),
+          isOnline: true,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        // Update existing document
+        await updateDoc(lawyerRef, {
+          [`availability.${fieldMapping[service]}`]: newValue,
+          lastActive: serverTimestamp(),
+          isOnline: true
+        });
+      }
+      
+      // Update local state only after successful database update
+      setServices(prev => ({ ...prev, [service]: newValue }));
       console.log(`${service} availability updated successfully`);
     } catch (error) {
       console.error(`Error updating ${service} availability:`, error);
-      // Revert local state if update fails
-      setServices(prev => ({ ...prev, [service]: services[service] }));
+      alert(`Failed to update ${service} availability. Please try again.`);
     }
   };
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Scale, Phone, Mail, Edit3, Save, X } from "lucide-react";
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateLawyerProfile } from '../services/lawyerStatusService';
 
