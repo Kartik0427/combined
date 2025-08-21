@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import LoginPage from './components/LoginPage';
 import LawyerPortal from './LawyerPortal';
+import LoadingPage from './pages/LoadingPage'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -35,9 +36,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
+      <LoadingPage/>
     );
   }
 
