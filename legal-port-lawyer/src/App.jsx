@@ -27,8 +27,8 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#22223B] via-[#4A4E69] to-[#9A8C98]">
-        <div className="text-lg text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }

@@ -6,12 +6,11 @@ import { auth } from "./firebase";
 // Import all the page components
 import Dashboard from "./pages/Dashboard";
 import ProfilePage from "./pages/ProfilePage";
-import EditProfile from './pages/EditProfile';
-import AnalyticsPage from "./pages/AnalyticsPage";
 import ReportsPage from "./pages/ReportsPage";
-import ChatPage from "./pages/ChatPage";
 import ContactPage from "./pages/ContactPage";
 import ReviewsPage from "./pages/ReviewsPage";
+import ChatPage from "./pages/ChatPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import RequestsPage from "./pages/RequestsPage";
 
@@ -70,8 +69,6 @@ const LawyerPortal = ({ onLogout }) => {
     switch (currentPage) {
       case "profile":
         return <ProfilePage {...pageProps} />;
-      case "editProfile":
-        return <EditProfile user={user} setCurrentPage={setCurrentPage} />;
       case "analytics":
         return <AnalyticsPage {...pageProps} />;
       case "reports":

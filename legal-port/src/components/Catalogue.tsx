@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin } from 'lucide-react';
-import { subscribeLawyers, Lawyer } from '../services/lawyerService';
+import { fetchLawyers, Lawyer } from '../services/lawyerService';
 
 
 
@@ -22,27 +23,21 @@ const LawyerCatalogue: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-
-    const unsubscribe = subscribeLawyers((fetchedLawyers) => {
-      setLawyers(fetchedLawyers);
-      setLoading(false);
-      setError(null);
-    });
-
-    // Handle errors
-    const errorTimeout = setTimeout(() => {
-      if (lawyers.length === 0 && loading) {
-        setError('Failed to load lawyers');
+    const loadLawyers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const fetchedLawyers = await fetchLawyers();
+        setLawyers(fetchedLawyers);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load lawyers');
+        console.error('Error loading lawyers:', err);
+      } finally {
         setLoading(false);
       }
-    }, 10000);
-
-    return () => {
-      unsubscribe();
-      clearTimeout(errorTimeout);
     };
+
+    loadLawyers();
   }, []);
 
   const [filters, setFilters] = useState<Filters>({
@@ -79,14 +74,14 @@ const LawyerCatalogue: React.FC = () => {
     let filtered = lawyers.filter(lawyer => {
       const matchesSearch = lawyer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            lawyer.specializations.some(spec => spec.toLowerCase().includes(searchTerm.toLowerCase()));
-
+      
       const matchesSpecialization = filters.specializations.length === 0 ||
-                                   filters.specializations.some(filterSpec =>
-                                     lawyer.specializations.some(lawyerSpec =>
+                                   filters.specializations.some(filterSpec => 
+                                     lawyer.specializations.some(lawyerSpec => 
                                        lawyerSpec.toLowerCase().includes(filterSpec.toLowerCase())
                                      )
                                    );
-
+      
       return (
         matchesSearch &&
         matchesSpecialization &&
@@ -196,8 +191,8 @@ const LawyerCatalogue: React.FC = () => {
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 rounded-xl mb-2 shadow-lg overflow-hidden">
                 {lawyer.image ? (
-                  <img
-                    src={lawyer.image}
+                  <img 
+                    src={lawyer.image} 
                     alt={lawyer.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -510,7 +505,7 @@ const LawyerCatalogue: React.FC = () => {
           <p className="text-gray-300 text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
             Connect with verified lawyers instantly via chat, call, or video consultation
           </p>
-
+          
           {/* Search Bar */}
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
@@ -524,8 +519,8 @@ const LawyerCatalogue: React.FC = () => {
               />
             </div>
           </div>
-
-
+          
+          
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
@@ -582,7 +577,7 @@ const LawyerCatalogue: React.FC = () => {
             )}
 
             {/* No Results State */}
-            {filteredAndSortedLawyers.length === 0 && !loading && !error && (
+            {filteredAndSortedLawyers.length === 0 && (
               <div className="text-center py-20">
                 <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-white/20">
                   <div className="text-gray-400 mb-6">
