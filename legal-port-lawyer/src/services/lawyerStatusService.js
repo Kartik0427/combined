@@ -1,15 +1,31 @@
 
-import { doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export const updateLawyerAvailability = async (lawyerId, serviceType, isAvailable) => {
   try {
     const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
-    await updateDoc(lawyerRef, {
-      [`availability.${serviceType}`]: isAvailable,
-      lastActive: serverTimestamp(),
-      isOnline: true
-    });
+    
+    // Check if document exists, if not create it
+    const docSnap = await getDoc(lawyerRef);
+    if (!docSnap.exists()) {
+      await setDoc(lawyerRef, {
+        availability: {
+          audio: false,
+          video: false,
+          chat: false,
+          [serviceType]: isAvailable
+        },
+        isOnline: true,
+        lastActive: serverTimestamp()
+      });
+    } else {
+      await updateDoc(lawyerRef, {
+        [`availability.${serviceType}`]: isAvailable,
+        lastActive: serverTimestamp()
+      });
+    }
+    
     console.log(`${serviceType} availability updated to:`, isAvailable);
   } catch (error) {
     console.error('Error updating availability:', error);
@@ -20,10 +36,26 @@ export const updateLawyerAvailability = async (lawyerId, serviceType, isAvailabl
 export const updateLawyerOnlineStatus = async (lawyerId, isOnline) => {
   try {
     const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
-    await updateDoc(lawyerRef, {
-      isOnline: isOnline,
-      lastActive: serverTimestamp()
-    });
+    
+    // Check if document exists, if not create it
+    const docSnap = await getDoc(lawyerRef);
+    if (!docSnap.exists()) {
+      await setDoc(lawyerRef, {
+        isOnline: isOnline,
+        availability: {
+          audio: false,
+          video: false,
+          chat: false
+        },
+        lastActive: serverTimestamp()
+      });
+    } else {
+      await updateDoc(lawyerRef, {
+        isOnline: isOnline,
+        lastActive: serverTimestamp()
+      });
+    }
+    
     console.log('Online status updated to:', isOnline);
   } catch (error) {
     console.error('Error updating online status:', error);
@@ -46,10 +78,28 @@ export const subscribeLawyerStatus = (lawyerId, callback) => {
 export const updateLawyerProfile = async (lawyerId, profileData) => {
   try {
     const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
-    await updateDoc(lawyerRef, {
-      ...profileData,
-      updatedAt: serverTimestamp()
-    });
+    
+    // Check if document exists, if not create it with profile data
+    const docSnap = await getDoc(lawyerRef);
+    if (!docSnap.exists()) {
+      await setDoc(lawyerRef, {
+        ...profileData,
+        isOnline: false,
+        availability: {
+          audio: false,
+          video: false,
+          chat: false
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      await updateDoc(lawyerRef, {
+        ...profileData,
+        updatedAt: serverTimestamp()
+      });
+    }
+    
     console.log('Profile updated successfully');
   } catch (error) {
     console.error('Error updating profile:', error);

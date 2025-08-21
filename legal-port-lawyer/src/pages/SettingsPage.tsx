@@ -44,26 +44,45 @@ const SettingsPage = ({ user, setCurrentPage }) => {
   }, [user]);
 
   const toggleOnlineStatus = async () => {
+    if (!user?.uid) {
+      console.error('No user ID available');
+      return;
+    }
+    
     const newStatus = !settings.isOnline;
     setLoading(prev => ({ ...prev, online: true }));
     
     try {
       await updateLawyerOnlineStatus(user.uid, newStatus);
+      // Update local state optimistically
+      setSettings(prev => ({ ...prev, isOnline: newStatus }));
     } catch (error) {
       console.error('Error updating online status:', error);
+      alert('Failed to update online status. Please try again.');
     } finally {
       setLoading(prev => ({ ...prev, online: false }));
     }
   };
 
   const toggleAvailability = async (serviceType) => {
+    if (!user?.uid) {
+      console.error('No user ID available');
+      return;
+    }
+    
     const newStatus = !settings.availability[serviceType];
     setLoading(prev => ({ ...prev, [serviceType]: true }));
     
     try {
       await updateLawyerAvailability(user.uid, serviceType, newStatus);
+      // Update local state optimistically
+      setSettings(prev => ({
+        ...prev,
+        availability: { ...prev.availability, [serviceType]: newStatus }
+      }));
     } catch (error) {
       console.error('Error updating availability:', error);
+      alert(`Failed to update ${serviceType} availability. Please try again.`);
     } finally {
       setLoading(prev => ({ ...prev, [serviceType]: false }));
     }

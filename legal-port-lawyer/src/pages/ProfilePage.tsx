@@ -49,10 +49,27 @@ const ProfilePage = ({ user, setCurrentPage }) => {
   }, [user]);
 
   const handleSaveProfile = async () => {
+    if (!user?.uid) {
+      alert('User not authenticated. Please log in again.');
+      return;
+    }
+    
+    // Basic validation
+    if (!editForm.name.trim()) {
+      alert('Name is required');
+      return;
+    }
+    
+    if (!editForm.email.trim()) {
+      alert('Email is required');
+      return;
+    }
+    
     setLoading(true);
     try {
       await updateLawyerProfile(user.uid, editForm);
       setIsEditing(false);
+      alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error saving profile:', error);
       alert('Error saving profile. Please try again.');

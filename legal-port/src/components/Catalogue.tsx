@@ -79,14 +79,14 @@ const LawyerCatalogue: React.FC = () => {
     let filtered = lawyers.filter(lawyer => {
       const matchesSearch = lawyer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            lawyer.specializations.some(spec => spec.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+
       const matchesSpecialization = filters.specializations.length === 0 ||
-                                   filters.specializations.some(filterSpec => 
-                                     lawyer.specializations.some(lawyerSpec => 
+                                   filters.specializations.some(filterSpec =>
+                                     lawyer.specializations.some(lawyerSpec =>
                                        lawyerSpec.toLowerCase().includes(filterSpec.toLowerCase())
                                      )
                                    );
-      
+
       return (
         matchesSearch &&
         matchesSpecialization &&
@@ -196,8 +196,8 @@ const LawyerCatalogue: React.FC = () => {
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 rounded-xl mb-2 shadow-lg overflow-hidden">
                 {lawyer.image ? (
-                  <img 
-                    src={lawyer.image} 
+                  <img
+                    src={lawyer.image}
                     alt={lawyer.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -510,7 +510,7 @@ const LawyerCatalogue: React.FC = () => {
           <p className="text-gray-300 text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
             Connect with verified lawyers instantly via chat, call, or video consultation
           </p>
-          
+
           {/* Search Bar */}
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
@@ -524,8 +524,8 @@ const LawyerCatalogue: React.FC = () => {
               />
             </div>
           </div>
-          
-          
+
+
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">

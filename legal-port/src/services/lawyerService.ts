@@ -137,6 +137,8 @@ export const subscribeLawyerAvailability = (lawyerId: string, callback: (availab
         lastActive: data.lastActive?.toDate() || new Date()
       });
     }
+  }, (error) => {
+    console.error('Error listening to lawyer availability:', error);
   });
 };
 
@@ -145,14 +147,15 @@ export const subscribeLawyers = (callback: (lawyers: Lawyer[]) => void) => {
   const lawyersRef = collection(db, 'lawyer_profiles');
   
   return onSnapshot(lawyersRef, async (snapshot) => {
-    const lawyerPromises = snapshot.docs.map(async (doc) => {
-      const data = doc.data();
+    try {
+      const lawyerPromises = snapshot.docs.map(async (doc) => {
+        const data = doc.data();
 
-      // Fetch categories from categories collection
-      const specializations = await fetchLawyerCategories(doc.id);
+        // Fetch categories from categories collection
+        const specializations = await fetchLawyerCategories(doc.id);
 
-      // Get the proper image URL
-      const imageUrl = await getImageUrl(data.image || '');
+        // Get the proper image URL
+        const imageUrl = await getImageUrl(data.image || '');
 
       return {
         id: doc.id,
