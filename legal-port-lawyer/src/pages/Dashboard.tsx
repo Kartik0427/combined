@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { doc, updateDoc, onSnapshot, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -10,15 +11,17 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
     chat: false
   });
   const [incomingCall, setIncomingCall] = useState(false);
-  const [analyticsView, setAnalyticsView] = useState('week');
   const [profile, setProfile] = useState({
-    name: user.name,
-    specialization: user.specialization,
+    name: user?.name || '',
+    specialization: user?.specialization || '',
     cases: 0,
     rating: 0
   });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!user?.uid) return;
+
     const fetchLawyerProfile = async () => {
       try {
         const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
@@ -26,17 +29,48 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+          console.log('Profile data:', data);
+          
           setProfile({
-            name: data.name || user.name,
-            specialization: data.specialization || user.specialization,
+            name: data.name || user.name || '',
+            specialization: data.specialization || user.specialization || '',
             cases: data.cases || 0,
             rating: data.rating || 0
           });
+          
           // Initialize services state from fetched data
           setServices({
             videoCall: data.availability?.video || false,
             audioCall: data.availability?.audio || false,
             chat: data.availability?.chat || false,
+          });
+        } else {
+          // Create initial profile if doesn't exist
+          const initialProfile = {
+            name: user.name || '',
+            specialization: user.specialization || '',
+            email: user.email || '',
+            availability: {
+              video: false,
+              audio: false,
+              chat: false
+            },
+            isOnline: false,
+            rating: 0,
+            reviews: 0,
+            connections: 0,
+            verified: false,
+            cases: 0,
+            createdAt: serverTimestamp(),
+            lastActive: serverTimestamp()
+          };
+          
+          await setDoc(lawyerRef, initialProfile);
+          setProfile({
+            name: initialProfile.name,
+            specialization: initialProfile.specialization,
+            cases: 0,
+            rating: 0
           });
         }
       } catch (error) {
@@ -46,13 +80,17 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
 
     fetchLawyerProfile();
 
+    // Simulate incoming calls
     const interval = setInterval(() => {
       setIncomingCall(prev => !prev);
     }, 4000);
+    
     return () => clearInterval(interval);
-  }, [user.uid, user.name, user.specialization]);
+  }, [user]);
 
   const toggleService = async (service) => {
+    if (!user?.uid) return;
+    
     const fieldMapping = {
       videoCall: 'video',
       audioCall: 'audio',
@@ -60,6 +98,7 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
     };
     
     const newValue = !services[service];
+    setLoading(true);
     
     try {
       const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
@@ -68,18 +107,26 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
       const docSnap = await getDoc(lawyerRef);
       if (!docSnap.exists()) {
         // Create document with basic profile data
-        await setDoc(lawyerRef, {
-          name: user.name,
-          specialization: user.specialization,
+        const initialData = {
+          name: user.name || '',
+          specialization: user.specialization || '',
+          email: user.email || '',
           availability: {
             video: service === 'videoCall' ? newValue : false,
             audio: service === 'audioCall' ? newValue : false,
             chat: service === 'chat' ? newValue : false
           },
-          lastActive: serverTimestamp(),
           isOnline: true,
-          createdAt: serverTimestamp()
-        });
+          rating: 0,
+          reviews: 0,
+          connections: 0,
+          verified: false,
+          cases: 0,
+          createdAt: serverTimestamp(),
+          lastActive: serverTimestamp()
+        };
+        
+        await setDoc(lawyerRef, initialData);
       } else {
         // Update existing document
         await updateDoc(lawyerRef, {
@@ -91,25 +138,24 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
       
       // Update local state only after successful database update
       setServices(prev => ({ ...prev, [service]: newValue }));
-      console.log(`${service} availability updated successfully`);
+      console.log(`${service} availability updated successfully to:`, newValue);
+      
     } catch (error) {
       console.error(`Error updating ${service} availability:`, error);
+      // Revert the optimistic update
       alert(`Failed to update ${service} availability. Please try again.`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Mock analytics data
-  const analyticsData = {
-    week: [12, 19, 15, 27, 22, 18, 25],
-    month: [45, 52, 48, 61, 58, 65, 72, 69, 75, 68, 82, 89, 95, 88, 92, 98, 105, 102, 110, 115, 108, 120, 118, 125, 128, 135, 132, 140, 138, 145],
-    year: [450, 520, 480, 610, 580, 650, 720, 690, 750, 680, 820, 890]
-  };
-
-  const labels = {
-    week: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    month: ['Jan 1', 'Jan 5', 'Jan 10', 'Jan 15', 'Jan 20', 'Jan 25', 'Feb 1', 'Feb 5', 'Feb 10', 'Feb 15', 'Feb 20', 'Feb 25', 'Mar 1', 'Mar 5', 'Mar 10', 'Mar 15', 'Mar 20', 'Mar 25', 'Apr 1', 'Apr 5', 'Apr 10', 'Apr 15', 'Apr 20', 'Apr 25', 'May 1', 'May 5', 'May 10', 'May 15', 'May 20', 'May 25'],
-    year: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-  };
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#22223B] via-[#4A4E69] to-[#9A8C98]">
+        <div className="text-white">Loading user data...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#22223B] via-[#4A4E69] to-[#9A8C98] p-6">
@@ -123,23 +169,23 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
               </div>
               <div>
                 <p className="text-white/70 text-sm">Welcome</p>
-                <h2 className="text-2xl font-bold text-white">{profile?.name || user.name}</h2>
+                <h2 className="text-2xl font-bold text-white">{profile.name || user.name}</h2>
                 <p className="text-white/80 mb-2">
-                  {profile?.specialization || user.specialization}
+                  {profile.specialization || user.specialization}
                 </p>
               </div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm px-6 py-3 rounded-2xl border border-white/20">
-              <span className="text-xl font-bold text-[#F2E9E4]">₹ {balance.toLocaleString()}</span>
+              <span className="text-xl font-bold text-[#F2E9E4]">₹ {balance?.toLocaleString() || '0'}</span>
             </div>
           </div>
 
           {/* Profile Edit Button */}
           <button
-            onClick={() => setCurrentPage('editProfile')}
+            onClick={() => setCurrentPage('profile')}
             className="mt-4 px-6 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white font-semibold hover:bg-white/30 transition-all duration-300 flex items-center gap-2"
           >
-            <User className="w-4 h-4" /> Edit Profile
+            <User className="w-4 h-4" /> View Profile
           </button>
         </div>
 
@@ -156,9 +202,10 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
                   type="checkbox"
                   checked={services.videoCall}
                   onChange={() => toggleService('videoCall')}
+                  disabled={loading}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-disabled:opacity-50"></div>
               </label>
             </div>
             <div className="flex items-center justify-between">
@@ -170,9 +217,10 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
                   type="checkbox"
                   checked={services.audioCall}
                   onChange={() => toggleService('audioCall')}
+                  disabled={loading}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-disabled:opacity-50"></div>
               </label>
             </div>
             <div className="flex items-center justify-between">
@@ -184,12 +232,18 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
                   type="checkbox"
                   checked={services.chat}
                   onChange={() => toggleService('chat')}
+                  disabled={loading}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-disabled:opacity-50"></div>
               </label>
             </div>
           </div>
+          {loading && (
+            <div className="mt-2 text-center">
+              <p className="text-white/60 text-sm">Updating services...</p>
+            </div>
+          )}
         </div>
 
         {/* Status Card */}
@@ -213,11 +267,11 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-6">
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-2xl">
-            <div className="text-3xl font-bold text-[#F2E9E4]">{profile?.cases || 0}</div>
+            <div className="text-3xl font-bold text-[#F2E9E4]">{profile.cases || 0}</div>
             <div className="text-sm text-white/70">Cases Handled</div>
           </div>
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-6 shadow-2xl">
-            <div className="text-3xl font-bold text-[#F2E9E4]">{profile?.rating || 0}</div>
+            <div className="text-3xl font-bold text-[#F2E9E4]">{profile.rating || 0}</div>
             <div className="text-sm text-white/70">Client Rating</div>
           </div>
         </div>

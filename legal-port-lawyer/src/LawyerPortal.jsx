@@ -70,6 +70,8 @@ const LawyerPortal = ({ onLogout }) => {
     switch (currentPage) {
       case "profile":
         return <ProfilePage {...pageProps} />;
+      case "editProfile":
+        return <EditProfile user={user} setCurrentPage={setCurrentPage} />;
       case "analytics":
         return <AnalyticsPage {...pageProps} />;
       case "reports":
