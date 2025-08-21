@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
-import { User, DollarSign, MessageSquare, Mail, Star, LogOut, Phone, Video, RefreshCw, Scale, TrendingUp, Calendar, BarChart3, Settings, Inbox } from 'lucide-react';
+import { User, DollarSign, MessageSquare, Mail, Star, LogOut, RefreshCw, Scale, BarChart3, Settings, Inbox } from 'lucide-react';
 
 const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
-  const [services, setServices] = useState({
-    videoCall: false,
-    audioCall: true,
-    chat: false
-  });
   const [incomingCall, setIncomingCall] = useState(false);
   const [analyticsView, setAnalyticsView] = useState('week');
 
@@ -32,26 +25,6 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const toggleService = async (service) => {
-    const newState = !services[service];
-    // Optimistically update local state
-    setServices(prev => ({ ...prev, [service]: newState }));
-
-    try {
-      const lawyerRef = doc(db, 'lawyer_profiles', user.uid);
-      await updateDoc(lawyerRef, {
-        [`availability.${service}`]: newState,
-        lastActive: serverTimestamp(),
-        isOnline: true
-      });
-
-      console.log(`${service} availability updated to:`, newState);
-    } catch (error) {
-      console.error('Error updating availability:', error);
-      // Revert the optimistic update on error
-      setServices(prev => ({ ...prev, [service]: !newState }));
-    }
-  };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#22223B] via-[#4A4E69] to-[#9A8C98] p-6">
@@ -73,38 +46,9 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
               <span className="text-xl font-bold text-[#F2E9E4]">₹ {balance.toLocaleString()}</span>
             </div>
           </div>
-
-          {/* Service Toggles */}
-          <div className="space-y-3 border-t border-white/20 pt-4">
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <Video className="w-5 h-5 text-white/80" />
-                <span className="text-white">Video Consultation</span>
-              </div>
-              <button onClick={() => toggleService('videoCall')} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors backdrop-blur-sm border border-white/20 ${services.videoCall ? 'bg-gradient-to-r from-[#C9ADA7] to-[#F2E9E4]' : 'bg-white/10'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${services.videoCall ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-white/80" />
-                <span className="text-white">Audio Consultation</span>
-              </div>
-              <button onClick={() => toggleService('audioCall')} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors backdrop-blur-sm border border-white/20 ${services.audioCall ? 'bg-gradient-to-r from-[#C9ADA7] to-[#F2E9E4]' : 'bg-white/10'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${services.audioCall ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <MessageSquare className="w-5 h-5 text-white/80" />
-                <span className="text-white">Chat Consultation</span>
-              </div>
-              <button onClick={() => toggleService('chat')} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors backdrop-blur-sm border border-white/20 ${services.chat ? 'bg-gradient-to-r from-[#C9ADA7] to-[#F2E9E4]' : 'bg-white/10'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${services.chat ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-          </div>
         </div>
+  
+          
 
 
 
