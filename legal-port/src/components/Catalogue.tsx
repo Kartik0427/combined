@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin } from 'lucide-react';
 import { fetchLawyers, Lawyer } from '../services/lawyerService';
@@ -244,31 +243,53 @@ const LawyerCatalogue: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            {(['audio', 'video', 'chat'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setSelectedCallType(type)}
-                className={`p-2 rounded-lg text-center transition-all duration-200 border ${
-                  selectedCallType === type
-                    ? 'bg-gradient-to-r from-gold to-yellow-500 text-dark-blue border-gold'
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
-                }`}
-              >
-                <div className="font-bold text-sm">₹{lawyer.pricing[type]}</div>
-                <div className="text-xs uppercase opacity-75">{type}</div>
-                <div className="text-xs opacity-60">per min</div>
-              </button>
-            ))}
+            {(['audio', 'video', 'chat'] as const).map((type) => {
+              const isAvailable = lawyer.availability && lawyer.availability[type];
+              return (
+                <button
+                  key={type}
+                  onClick={() => isAvailable && setSelectedCallType(type)}
+                  disabled={!isAvailable}
+                  className={`p-2 rounded-lg text-center transition-all duration-200 border cursor-pointer ${
+                    !isAvailable
+                      ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed opacity-50'
+                      : selectedCallType === type
+                      ? 'bg-gradient-to-r from-gold to-yellow-500 text-dark-blue border-gold'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-bold text-sm">₹{lawyer.pricing[type]}</div>
+                  <div className="text-xs uppercase opacity-75">{type}</div>
+                  <div className="text-xs opacity-60">
+                    {isAvailable ? 'per min' : 'unavailable'}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <button className="bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200">
+            <button 
+              disabled={!lawyer.availability?.[selectedCallType]}
+              className={`py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200 ${
+                lawyer.availability?.[selectedCallType]
+                  ? 'bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
               <Phone className="w-3 h-3" />
-              Call Now
+              {lawyer.availability?.[selectedCallType] ? 'Call Now' : 'Unavailable'}
             </button>
-            <button className="border border-gray-300 hover:border-gold text-gray-700 hover:text-gold py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200">
+            <button 
+              disabled={!lawyer.availability?.chat}
+              className={`border py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200 ${
+                lawyer.availability?.chat
+                  ? 'border-gray-300 hover:border-gold text-gray-700 hover:text-gold'
+                  : 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
+              }`}
+            >
               <MessageCircle className="w-3 h-3" />
-              Message
+              {lawyer.availability?.chat ? 'Message' : 'Unavailable'}
             </button>
           </div>
 

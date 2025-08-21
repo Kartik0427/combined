@@ -1,4 +1,3 @@
-
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore";
@@ -30,12 +29,12 @@ export interface Lawyer {
 // Function to convert Firebase Storage gs:// URL to HTTPS URL
 const getImageUrl = async (imageUrl: string): Promise<string> => {
   if (!imageUrl) return '';
-  
+
   // If it's already an HTTPS URL, return as is
   if (imageUrl.startsWith('http')) {
     return imageUrl;
   }
-  
+
   // If it's a gs:// URL, convert to download URL
   if (imageUrl.startsWith('gs://')) {
     try {
@@ -50,7 +49,7 @@ const getImageUrl = async (imageUrl: string): Promise<string> => {
       return '';
     }
   }
-  
+
   return imageUrl;
 };
 
@@ -127,7 +126,7 @@ export const fetchLawyers = async (): Promise<Lawyer[]> => {
 // Real-time listener for lawyer availability changes
 export const subscribeLawyerAvailability = (lawyerId: string, callback: (availability: any) => void) => {
   const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
-  
+
   return onSnapshot(lawyerRef, (doc) => {
     if (doc.exists()) {
       const data = doc.data();
@@ -143,7 +142,7 @@ export const subscribeLawyerAvailability = (lawyerId: string, callback: (availab
 // Real-time listener for all lawyers (for the main catalog)
 export const subscribeLawyers = (callback: (lawyers: Lawyer[]) => void) => {
   const lawyersRef = collection(db, 'lawyer_profiles');
-  
+
   return onSnapshot(lawyersRef, async (snapshot) => {
     const lawyerPromises = snapshot.docs.map(async (doc) => {
       const data = doc.data();
