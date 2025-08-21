@@ -74,36 +74,7 @@ const Dashboard = ({ user, balance, setCurrentPage, handleLogout }) => {
             </div>
           </div>
 
-          {/* Service Toggles */}
-          <div className="space-y-3 border-t border-white/20 pt-4">
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <Video className="w-5 h-5 text-white/80" />
-                <span className="text-white">Video Consultation</span>
-              </div>
-              <button onClick={() => toggleService('videoCall')} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors backdrop-blur-sm border border-white/20 ${services.videoCall ? 'bg-gradient-to-r from-[#C9ADA7] to-[#F2E9E4]' : 'bg-white/10'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${services.videoCall ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-white/80" />
-                <span className="text-white">Audio Consultation</span>
-              </div>
-              <button onClick={() => toggleService('audioCall')} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors backdrop-blur-sm border border-white/20 ${services.audioCall ? 'bg-gradient-to-r from-[#C9ADA7] to-[#F2E9E4]' : 'bg-white/10'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${services.audioCall ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <MessageSquare className="w-5 h-5 text-white/80" />
-                <span className="text-white">Chat Consultation</span>
-              </div>
-              <button onClick={() => toggleService('chat')} className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors backdrop-blur-sm border border-white/20 ${services.chat ? 'bg-gradient-to-r from-[#C9ADA7] to-[#F2E9E4]' : 'bg-white/10'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${services.chat ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-          </div>
+          
         </div>
 
 

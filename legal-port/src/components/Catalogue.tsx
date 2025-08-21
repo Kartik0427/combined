@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin } from 'lucide-react';
-import { fetchLawyers, Lawyer } from '../services/lawyerService';
+import { subscribeLawyers, Lawyer } from '../services/lawyerService';
 
 
 
@@ -23,21 +22,27 @@ const LawyerCatalogue: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadLawyers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const fetchedLawyers = await fetchLawyers();
-        setLawyers(fetchedLawyers);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load lawyers');
-        console.error('Error loading lawyers:', err);
-      } finally {
+    setLoading(true);
+    setError(null);
+
+    const unsubscribe = subscribeLawyers((fetchedLawyers) => {
+      setLawyers(fetchedLawyers);
+      setLoading(false);
+      setError(null);
+    });
+
+    // Handle errors
+    const errorTimeout = setTimeout(() => {
+      if (lawyers.length === 0 && loading) {
+        setError('Failed to load lawyers');
         setLoading(false);
       }
-    };
+    }, 10000);
 
-    loadLawyers();
+    return () => {
+      unsubscribe();
+      clearTimeout(errorTimeout);
+    };
   }, []);
 
   const [filters, setFilters] = useState<Filters>({
@@ -577,7 +582,7 @@ const LawyerCatalogue: React.FC = () => {
             )}
 
             {/* No Results State */}
-            {filteredAndSortedLawyers.length === 0 && (
+            {filteredAndSortedLawyers.length === 0 && !loading && !error && (
               <div className="text-center py-20">
                 <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-white/20">
                   <div className="text-gray-400 mb-6">

@@ -81,7 +81,7 @@ const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onSelectService }) => {
 
       {!lawyer.isOnline && (
         <div className="mt-4 text-center text-sm text-gray-500 bg-gray-50 py-2 px-3 rounded-lg">
-          Currently offline • Last seen {lawyer.lastActive.toRelativeTimeString()}
+          Currently offline • Last seen {lawyer.lastActive.toLocaleString()}
         </div>
       )}
     </div>
