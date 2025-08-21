@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Mail, Lock, Scale, Eye, EyeOff } from 'lucide-react';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
