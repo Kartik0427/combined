@@ -15,7 +15,11 @@ const LoginPage = ({ onLogin }) => {
     setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      onLogin(userCredential.user);
+      // onLogin is called automatically by the auth state listener in App.jsx
+      // but we can still call it for immediate UI updates if needed
+      if (onLogin) {
+        onLogin(userCredential.user);
+      }
     } catch (error) {
       const errorMessage = 
         error.code === 'auth/user-not-found' ? 'No account found with this email.' :
