@@ -1,0 +1,36 @@
+Module build failed (from ./node_modules/babel-loader/lib/index.js):
+SyntaxError: /home/runner/workspace/legal-port/src/services/lawyerService.ts: Unterminated template. (1:1)
+
+[0m[31m[1m>[22m[39m[90m 1 |[39m [32m` tags.[39m
+ [90m   |[39m  [31m[1m^[22m[39m
+ [90m 2 |[39m [32m[39m
+ [90m 3 |[39m [32m[39m
+ [90m 4 |[39m [32mimport { collection, onSnapshot, doc, getDoc, Timestamp } from 'firebase/firestore';[39m[0m
+    at constructor (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:367:19)
+    at TypeScriptParserMixin.raise (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:6627:19)
+    at Object.unterminated (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:5698:20)
+    at readStringContents (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:5393:14)
+    at TypeScriptParserMixin.readTemplateToken (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:6547:9)
+    at TypeScriptParserMixin.getTokenFromCode (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:6255:14)
+    at TypeScriptParserMixin.getTokenFromCode (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:10004:11)
+    at TypeScriptParserMixin.nextToken (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:5810:10)
+    at TypeScriptParserMixin.parse (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:14490:10)
+    at TypeScriptParserMixin.parse (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:10144:18)
+    at parse (/home/runner/workspace/legal-port/node_modules/@babel/parser/lib/index.js:14526:38)
+    at parser (/home/runner/workspace/legal-port/node_modules/@babel/core/lib/parser/index.js:41:34)
+    at parser.next ()
+    at normalizeFile (/home/runner/workspace/legal-port/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+    at normalizeFile.next ()
+    at run (/home/runner/workspace/legal-port/node_modules/@babel/core/lib/transformation/index.js:22:50)
+    at run.next ()
+    at transform (/home/runner/workspace/legal-port/node_modules/@babel/core/lib/transform.js:22:33)
+    at transform.next ()
+    at step (/home/runner/workspace/legal-port/node_modules/gensync/index.js:261:32)
+    at /home/runner/workspace/legal-port/node_modules/gensync/index.js:273:13
+    at async.call.result.err.err (/home/runner/workspace/legal-port/node_modules/gensync/index.js:223:11)
+    at /home/runner/workspace/legal-port/node_modules/gensync/index.js:189:28
+    at /home/runner/workspace/legal-port/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+    at /home/runner/workspace/legal-port/node_modules/gensync/index.js:113:33
+    at step (/home/runner/workspace/legal-port/node_modules/gensync/index.js:287:14)
+    at /home/runner/workspace/legal-port/node_modules/gensync/index.js:273:13
+    at async.call.result.err.err (/home/runner/workspace/legal-port/node_modules/gensync/index.js:223:11)
