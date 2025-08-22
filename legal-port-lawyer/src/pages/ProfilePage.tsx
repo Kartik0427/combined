@@ -1,9 +1,9 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { ArrowLeft, Scale, Phone, Mail, Plus, Trash2, Save, Edit3, DollarSign, Star, User, Calendar, BookOpen } from "lucide-react";
-import { db, auth } from "../firebase";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+
 
 const ProfilePage = ({ user, setCurrentPage }) => {
   const [isEditing, setIsEditing] = useState(false);
