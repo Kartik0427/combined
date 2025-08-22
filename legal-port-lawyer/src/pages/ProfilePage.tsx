@@ -100,14 +100,25 @@ const ProfilePage = ({ user, setCurrentPage }) => {
                 const categoryData = categoryDoc.data();
                 if (categoryData.names) {
                   Object.values(categoryData.names).forEach(name => {
-                    if (!specializationNames.includes(name)) {
+                    if (typeof name === 'string' && !specializationNames.includes(name)) {
                       specializationNames.push(name);
                     }
                   });
                 }
+              } else {
+                // If category document doesn't exist, try to infer from the ID
+                const inferredName = specId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                if (!specializationNames.includes(inferredName)) {
+                  specializationNames.push(inferredName);
+                }
               }
             } catch (error) {
               console.error(`Error fetching category ${specId}:`, error);
+              // Fallback: use the category ID as name
+              const fallbackName = specId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              if (!specializationNames.includes(fallbackName)) {
+                specializationNames.push(fallbackName);
+              }
             }
           }
         }
@@ -198,32 +209,23 @@ const ProfilePage = ({ user, setCurrentPage }) => {
   };
 
   const findOrCreateCategory = async (categoryName) => {
-    // First, try to find existing category with this name
-    const categoriesRef = collection(db, 'categories');
-    const snapshot = await getDocs(categoriesRef);
-    
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      if (data.names && Object.values(data.names).includes(categoryName)) {
-        return doc.id;
+    try {
+      // First, try to find existing category with this name
+      const categoriesRef = collection(db, 'categories');
+      const snapshot = await getDocs(categoriesRef);
+      
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (data.names && Object.values(data.names).includes(categoryName)) {
+          return doc.id;
+        }
       }
-    }
-    
-    // If not found, create new category document
-    // We'll use a simple approach - create a document with the category name as both id and value
-    const categoryId = categoryName.toLowerCase().replace(/\s+/g, '_');
-    const categoryRef = doc(db, 'categories', categoryId);
-    
-    await updateDoc(categoryRef, {
-      names: {
-        0: categoryName
-      },
-      description: `Legal matters related to ${categoryName}`,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }).catch(async () => {
-      // If document doesn't exist, create it
+      
+      // If not found, create new category document
+      const categoryId = categoryName.toLowerCase().replace(/\s+/g, '_');
+      const categoryRef = doc(db, 'categories', categoryId);
+      
+      // Always use setDoc to create new documents
       await setDoc(categoryRef, {
         names: {
           0: categoryName
@@ -233,9 +235,13 @@ const ProfilePage = ({ user, setCurrentPage }) => {
         createdAt: new Date(),
         updatedAt: new Date()
       });
-    });
-    
-    return categoryId;
+      
+      return categoryId;
+    } catch (error) {
+      console.error('Error finding or creating category:', error);
+      // Return a fallback category ID if creation fails
+      return categoryName.toLowerCase().replace(/\s+/g, '_');
+    }
   };
 
   const handleSave = async () => {
@@ -245,41 +251,76 @@ const ProfilePage = ({ user, setCurrentPage }) => {
     try {
       // Find or create category IDs for selected specializations
       const selectedCategoryIds = [];
-      for (const categoryName of profileData.selectedCategories) {
-        const categoryId = await findOrCreateCategory(categoryName);
-        selectedCategoryIds.push(categoryId);
+      
+      if (profileData.selectedCategories && profileData.selectedCategories.length > 0) {
+        for (const categoryName of profileData.selectedCategories) {
+          if (categoryName && categoryName.trim()) {
+            const categoryId = await findOrCreateCategory(categoryName.trim());
+            selectedCategoryIds.push(categoryId);
+          }
+        }
       }
 
       const updateData = {
-        name: profileData.name,
-        email: profileData.email,
-        phoneNumber: profileData.phoneNumber,
-        bio: profileData.bio,
-        experience: Number(profileData.experience),
+        name: profileData.name || "",
+        email: profileData.email || "",
+        phoneNumber: profileData.phoneNumber || "",
+        bio: profileData.bio || "",
+        experience: Number(profileData.experience) || 0,
         pricing: {
-          audio: Number(profileData.pricing.audio),
-          video: Number(profileData.pricing.video),
-          chat: Number(profileData.pricing.chat)
+          audio: Number(profileData.pricing.audio) || 0,
+          video: Number(profileData.pricing.video) || 0,
+          chat: Number(profileData.pricing.chat) || 0
         },
-        education: (profileData.education || []).filter(edu => edu && edu.degree && edu.institution),
+        education: (profileData.education || []).filter(edu => 
+          edu && 
+          edu.degree && 
+          edu.degree.trim() && 
+          edu.institution && 
+          edu.institution.trim()
+        ),
         specializations: selectedCategoryIds,
         updatedAt: new Date()
       };
 
       const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
-      await updateDoc(lawyerRef, updateData);
+      
+      // Check if document exists, if not create it
+      const lawyerDoc = await getDoc(lawyerRef);
+      if (lawyerDoc.exists()) {
+        await updateDoc(lawyerRef, updateData);
+      } else {
+        await setDoc(lawyerRef, {
+          ...updateData,
+          createdAt: new Date(),
+          isOnline: false,
+          availability: {
+            audio: false,
+            video: false,
+            chat: false
+          },
+          rating: 0,
+          reviews: 0,
+          connections: 0,
+          verified: false
+        });
+      }
       
       // Update the specializations in profile data for display
       setProfileData(prev => ({
         ...prev,
-        specializations: profileData.selectedCategories
+        specializations: profileData.selectedCategories || []
       }));
       
       setIsEditing(false);
       alert('Profile updated successfully!');
+      
+      // Refresh the profile data to ensure it's in sync
+      await fetchLawyerProfile(lawyerId);
+      
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
+      alert(`Failed to update profile: ${error.message}`);
     } finally {
       setSaving(false);
     }
