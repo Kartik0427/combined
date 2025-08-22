@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin, Wifi, WifiOff } from 'lucide-react';
-import { Lawyer, fetchLawyers } from '../services/lawyerService';
-import { useLawyerAvailability } from '../hooks/useLawyerAvailability'; // Assuming this hook is in a 'hooks' directory
+import React, { useState, useMemo, useEffect } from 'react';
+import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin } from 'lucide-react';
+import { fetchLawyers, Lawyer } from '../services/lawyerService';
 
-// Define the Filters interface
+
+
 interface Filters {
   maxAudioRate: number;
   maxVideoRate: number;
@@ -21,29 +21,6 @@ const LawyerCatalogue: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for filters and search
-  const [filters, setFilters] = useState<Filters>({
-    maxAudioRate: 40,
-    maxVideoRate: 30,
-    maxChatRate: 35,
-    minRating: 0,
-    minExperience: 0,
-    onlineOnly: false,
-    specializations: [],
-    sortBy: 'rating',
-    sortOrder: 'desc'
-  });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Use real-time availability hook
-  const {
-    isConnected,
-    connectionError,
-    getLawyersWithUpdatedAvailability
-  } = useLawyerAvailability(lawyers);
-
-  // Effect to fetch lawyers initially
   useEffect(() => {
     const loadLawyers = async () => {
       try {
@@ -62,49 +39,61 @@ const LawyerCatalogue: React.FC = () => {
     loadLawyers();
   }, []);
 
-  // Function to apply filters and sorting
-  const applyFiltersAndSorting = (currentLawyers: Lawyer[]) => {
-    let filtered = [...currentLawyers];
+  const [filters, setFilters] = useState<Filters>({
+    maxAudioRate: 40,
+    maxVideoRate: 30,
+    maxChatRate: 35,
+    minRating: 0,
+    minExperience: 0,
+    onlineOnly: false,
+    specializations: [],
+    sortBy: 'rating',
+    sortOrder: 'desc'
+  });
 
-    // Search Term Filter
-    if (searchTerm) {
-      filtered = filtered.filter(lawyer =>
-        lawyer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lawyer.specializations.some(spec => spec.toLowerCase().includes(searchTerm.toLowerCase()))
+  const availableSpecializations = [
+    'Matrimonial',
+    'Commercial',
+    'Consumer',
+    'Child Laws',
+    'Civil',
+    'Corporate',
+    'Labour Law',
+    'Property Rights',
+    'Cheque Bounce',
+    'Documentation',
+    'Criminal',
+    'Challans'
+  ];
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredAndSortedLawyers = useMemo(() => {
+    let filtered = lawyers.filter(lawyer => {
+      const matchesSearch = lawyer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           lawyer.specializations.some(spec => spec.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesSpecialization = filters.specializations.length === 0 ||
+                                   filters.specializations.some(filterSpec => 
+                                     lawyer.specializations.some(lawyerSpec => 
+                                       lawyerSpec.toLowerCase().includes(filterSpec.toLowerCase())
+                                     )
+                                   );
+      
+      return (
+        matchesSearch &&
+        matchesSpecialization &&
+        lawyer.pricing.audio <= filters.maxAudioRate &&
+        lawyer.pricing.video <= filters.maxVideoRate &&
+        lawyer.pricing.chat <= filters.maxChatRate &&
+        lawyer.rating >= filters.minRating &&
+        lawyer.experience >= filters.minExperience &&
+        (!filters.onlineOnly || lawyer.isOnline)
       );
-    }
+    });
 
-    // Specialization Filter
-    if (filters.specializations.length > 0) {
-      filtered = filtered.filter(lawyer =>
-        lawyer.specializations.some(filterSpec =>
-          filters.specializations.some(lawyerSpec =>
-            lawyerSpec.toLowerCase().includes(filterSpec.toLowerCase())
-          )
-        )
-      );
-    }
-
-    // Price Filters
-    filtered = filtered.filter(lawyer =>
-      lawyer.pricing.audio <= filters.maxAudioRate &&
-      lawyer.pricing.video <= filters.maxVideoRate &&
-      lawyer.pricing.chat <= filters.maxChatRate
-    );
-
-    // Rating Filter
-    filtered = filtered.filter(lawyer => lawyer.rating >= filters.minRating);
-
-    // Experience Filter
-    filtered = filtered.filter(lawyer => lawyer.experience >= filters.minExperience);
-
-    // Online Only Filter
-    if (filters.onlineOnly) {
-      filtered = filtered.filter(lawyer => lawyer.isOnline);
-    }
-
-    // Sorting
-    filtered.sort((a, b) => {
+    return filtered.sort((a, b) => {
       let aValue: number | string;
       let bValue: number | string;
 
@@ -139,42 +128,17 @@ const LawyerCatalogue: React.FC = () => {
       }
 
       if (filters.sortOrder === 'asc') {
-        // For string comparison, ensure case-insensitivity if needed, though 'name' is usually fine.
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return aValue.localeCompare(bValue);
-        }
-        return (aValue as number) - (bValue as number);
+        return aValue > bValue ? 1 : -1;
       } else {
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return bValue.localeCompare(aValue);
-        }
-        return (bValue as number) - (aValue as number);
+        return aValue < bValue ? 1 : -1;
       }
     });
+  }, [lawyers, filters, searchTerm]);
 
-    return filtered;
-  };
-
-  // Memoize the filtered and sorted lawyers
-  const filteredAndSortedLawyers = useMemo(() => {
-    if (lawyers.length === 0) return [];
-    const updatedLawyers = getLawyersWithUpdatedAvailability(lawyers);
-    return applyFiltersAndSorting(updatedLawyers);
-  }, [lawyers, filters, searchTerm, getLawyersWithUpdatedAvailability]);
-
-  // Available specializations for filter dropdown
-  const availableSpecializations = [
-    'Matrimonial', 'Commercial', 'Consumer', 'Child Laws', 'Civil',
-    'Corporate', 'Labour Law', 'Property Rights', 'Cheque Bounce',
-    'Documentation', 'Criminal', 'Challans'
-  ];
-
-  // Handler for updating filters
   const updateFilter = (key: keyof Filters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  // Handler to reset all filters
   const resetFilters = () => {
     setFilters({
       maxAudioRate: 40,
@@ -190,7 +154,6 @@ const LawyerCatalogue: React.FC = () => {
     setSearchTerm('');
   };
 
-  // Handler to toggle specialization selection
   const toggleSpecialization = (specialization: string) => {
     setFilters(prev => ({
       ...prev,
@@ -200,18 +163,14 @@ const LawyerCatalogue: React.FC = () => {
     }));
   };
 
-  // LawyerCard component for displaying individual lawyer details
   const LawyerCard: React.FC<{ lawyer: Lawyer }> = ({ lawyer }) => {
     const [selectedCallType, setSelectedCallType] = useState<'audio' | 'video' | 'chat'>('video');
-
-    const isCallTypeAvailable = (type: 'audio' | 'video' | 'chat') => lawyer.availability?.[type] ?? false;
 
     return (
       <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden border border-gray-100 group">
         <div className="bg-gradient-to-br from-dark-blue via-slate-800 to-dark-blue p-4 text-white relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-3">
-              {/* Availability Status */}
               <div className={`px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
                 lawyer.isOnline ? 'bg-green-500/20 border border-green-400/30' : 'bg-gray-500/20 border border-gray-400/30'
               }`}>
@@ -220,7 +179,6 @@ const LawyerCatalogue: React.FC = () => {
                 }`}></div>
                 {lawyer.isOnline ? 'Available Now' : 'Offline'}
               </div>
-              {/* Verified Status */}
               {lawyer.verified && (
                 <div className="bg-gold/90 text-dark-blue px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" />
@@ -229,24 +187,21 @@ const LawyerCatalogue: React.FC = () => {
               )}
             </div>
 
-            {/* Lawyer Info */}
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 rounded-xl mb-2 shadow-lg overflow-hidden">
                 {lawyer.image ? (
-                  <img
-                    src={lawyer.image}
+                  <img 
+                    src={lawyer.image} 
                     alt={lawyer.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
+                      // Fallback to initials if image fails to load
                       const target = e.target as HTMLImageElement;
-                      target.style.display = 'none'; // Hide the broken image
-                      if (target.nextElementSibling) {
-                        target.nextElementSibling.classList.remove('hidden'); // Show initials
-                      }
+                      target.style.display = 'none';
+                      target.nextElementSibling!.classList.remove('hidden');
                     }}
                   />
                 ) : null}
-                {/* Fallback to initials if image fails to load or is not provided */}
                 <div className={`w-full h-full bg-gradient-to-br from-gold to-yellow-600 rounded-xl flex items-center justify-center text-dark-blue font-bold text-lg ${lawyer.image ? 'hidden' : ''}`}>
                   {lawyer.name.charAt(0).toUpperCase()}
                 </div>
@@ -266,9 +221,7 @@ const LawyerCatalogue: React.FC = () => {
           </div>
         </div>
 
-        {/* Details Section */}
         <div className="p-4 space-y-3">
-          {/* Rating */}
           <div className="flex items-center justify-center gap-2 bg-yellow-50 p-2 rounded-lg">
             <div className="flex">
               {[...Array(5)].map((_, i) => (
@@ -282,7 +235,6 @@ const LawyerCatalogue: React.FC = () => {
             <span className="text-xs text-yellow-700">({lawyer.reviews.toLocaleString()} reviews)</span>
           </div>
 
-          {/* Experience */}
           <div className="text-center">
             <div className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg inline-flex items-center gap-1 text-sm font-bold">
               <MapPin className="w-3 h-3" />
@@ -290,57 +242,57 @@ const LawyerCatalogue: React.FC = () => {
             </div>
           </div>
 
-          {/* Call Type Pricing */}
           <div className="grid grid-cols-3 gap-2">
-            {(['audio', 'video', 'chat'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => isCallTypeAvailable(type) && setSelectedCallType(type)}
-                disabled={!isCallTypeAvailable(type)}
-                className={`p-2 rounded-lg text-center transition-all duration-200 border cursor-pointer ${
-                  !isCallTypeAvailable(type)
-                    ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed opacity-50'
-                    : selectedCallType === type
-                    ? 'bg-gradient-to-r from-gold to-yellow-500 text-dark-blue border-gold'
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-bold text-sm">₹{lawyer.pricing[type]}</div>
-                <div className="text-xs uppercase opacity-75">{type}</div>
-                <div className="text-xs opacity-60">
-                  {isCallTypeAvailable(type) ? 'per min' : 'unavailable'}
-                </div>
-              </button>
-            ))}
+            {(['audio', 'video', 'chat'] as const).map((type) => {
+              const isAvailable = lawyer.availability && lawyer.availability[type];
+              return (
+                <button
+                  key={type}
+                  onClick={() => isAvailable && setSelectedCallType(type)}
+                  disabled={!isAvailable}
+                  className={`p-2 rounded-lg text-center transition-all duration-200 border cursor-pointer ${
+                    !isAvailable
+                      ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed opacity-50'
+                      : selectedCallType === type
+                      ? 'bg-gradient-to-r from-gold to-yellow-500 text-dark-blue border-gold'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-bold text-sm">₹{lawyer.pricing[type]}</div>
+                  <div className="text-xs uppercase opacity-75">{type}</div>
+                  <div className="text-xs opacity-60">
+                    {isAvailable ? 'per min' : 'unavailable'}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-2">
-            <button
-              disabled={!isCallTypeAvailable(selectedCallType)}
+            <button 
+              disabled={!lawyer.availability?.[selectedCallType]}
               className={`py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200 ${
-                isCallTypeAvailable(selectedCallType)
+                lawyer.availability?.[selectedCallType]
                   ? 'bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
               <Phone className="w-3 h-3" />
-              {isCallTypeAvailable(selectedCallType) ? 'Call Now' : 'Unavailable'}
+              {lawyer.availability?.[selectedCallType] ? 'Call Now' : 'Unavailable'}
             </button>
-            <button
-              disabled={!isCallTypeAvailable('chat')}
+            <button 
+              disabled={!lawyer.availability?.chat}
               className={`border py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200 ${
-                isCallTypeAvailable('chat')
+                lawyer.availability?.chat
                   ? 'border-gray-300 hover:border-gold text-gray-700 hover:text-gold'
                   : 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
               }`}
             >
               <MessageCircle className="w-3 h-3" />
-              {isCallTypeAvailable('chat') ? 'Message' : 'Unavailable'}
+              {lawyer.availability?.chat ? 'Message' : 'Unavailable'}
             </button>
           </div>
 
-          {/* Connection Count and Verified Status */}
           <div className="flex justify-between items-center pt-2 border-t border-gray-200 text-xs">
             <div className="flex items-center gap-1 text-gray-600">
               <User className="w-3 h-3" />
@@ -358,7 +310,6 @@ const LawyerCatalogue: React.FC = () => {
     );
   };
 
-  // FilterSidebar component for the filter panel
   const FilterSidebar: React.FC = () => (
     <div className={`${showFilters ? 'block' : 'hidden'} lg:block bg-white rounded-3xl shadow-xl p-8 space-y-8 border border-gray-100`}>
       <div className="flex items-center justify-between">
@@ -377,7 +328,6 @@ const LawyerCatalogue: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Sort By */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-3">Sort By</label>
           <div className="relative">
@@ -397,7 +347,6 @@ const LawyerCatalogue: React.FC = () => {
           </div>
         </div>
 
-        {/* Sort Order */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-3">Sort Order</label>
           <div className="flex gap-3">
@@ -424,7 +373,6 @@ const LawyerCatalogue: React.FC = () => {
           </div>
         </div>
 
-        {/* Specializations */}
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-4">Specializations</label>
           <div className="space-y-3 max-h-48 overflow-y-auto">
@@ -447,7 +395,6 @@ const LawyerCatalogue: React.FC = () => {
           </div>
         </div>
 
-        {/* Price Range Sliders */}
         <div className="space-y-5">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-3">
@@ -546,7 +493,6 @@ const LawyerCatalogue: React.FC = () => {
           </div>
         </div>
 
-        {/* Online Only Toggle */}
         <div className="pt-2">
           <label className="flex items-center space-x-4 cursor-pointer group">
             <input
@@ -559,7 +505,6 @@ const LawyerCatalogue: React.FC = () => {
           </label>
         </div>
 
-        {/* Reset Filters Button */}
         <button
           onClick={resetFilters}
           className="w-full py-4 px-6 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-bold rounded-xl transition-all duration-300 hover:scale-105"
@@ -570,7 +515,6 @@ const LawyerCatalogue: React.FC = () => {
     </div>
   );
 
-  // Main return statement for the component
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-blue via-slate-900 to-dark-blue">
       <div className="max-w-8xl mx-auto px-6 py-12">
@@ -582,7 +526,7 @@ const LawyerCatalogue: React.FC = () => {
           <p className="text-gray-300 text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
             Connect with verified lawyers instantly via chat, call, or video consultation
           </p>
-
+          
           {/* Search Bar */}
           <div className="max-w-xl mx-auto mb-8">
             <div className="relative">
@@ -596,30 +540,10 @@ const LawyerCatalogue: React.FC = () => {
               />
             </div>
           </div>
-
-          {/* Connection Status Indicator */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            {isConnected ? (
-              <div className="flex items-center gap-1 text-green-400 text-sm">
-                <Wifi className="w-4 h-4" />
-                <span>Live updates active</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-orange-400 text-sm">
-                <WifiOff className="w-4 h-4" />
-                <span>Reconnecting...</span>
-              </div>
-            )}
-            {connectionError && (
-              <div className="text-red-500 text-sm">
-                Error: {connectionError}
-              </div>
-            )}
-          </div>
-
+          
+          
         </div>
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
           {/* Filters Sidebar */}
           <div className="xl:col-span-1">
@@ -636,22 +560,24 @@ const LawyerCatalogue: React.FC = () => {
           {/* Lawyers Grid */}
           <div className="xl:col-span-4">
             {loading ? (
-              // Loading State
               <div className="text-center py-20">
                 <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-white/20">
-                  <div className="w-20 h-20 mx-auto opacity-50 animate-spin rounded-full border-4 border-gold border-t-transparent"></div>
-                  <h3 className="text-2xl font-bold text-white mb-4 mt-6">Loading lawyers...</h3>
+                  <div className="text-gray-400 mb-6">
+                    <div className="w-20 h-20 mx-auto opacity-50 animate-spin rounded-full border-4 border-gold border-t-transparent"></div>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4">Loading lawyers...</h3>
                   <p className="text-gray-300 leading-relaxed">
                     Please wait while we fetch the latest lawyer profiles
                   </p>
                 </div>
               </div>
             ) : error ? (
-              // Error State
               <div className="text-center py-20">
                 <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-white/20">
-                  <X className="w-20 h-20 mx-auto text-red-400 opacity-50" />
-                  <h3 className="text-2xl font-bold text-white mb-4 mt-6">Error loading lawyers</h3>
+                  <div className="text-red-400 mb-6">
+                    <X className="w-20 h-20 mx-auto opacity-50" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4">Error loading lawyers</h3>
                   <p className="text-gray-300 mb-8 leading-relaxed">
                     {error}
                   </p>
@@ -664,37 +590,37 @@ const LawyerCatalogue: React.FC = () => {
                 </div>
               </div>
             ) : (
-              // Lawyers List
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-8">
-                {filteredAndSortedLawyers.length > 0 ? (
-                  filteredAndSortedLawyers.map(lawyer => (
-                    <LawyerCard key={lawyer.id} lawyer={lawyer} />
-                  ))
-                ) : (
-                  // No Results State
-                  <div className="col-span-full text-center py-20">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-white/20">
-                      <Filter className="w-20 h-20 mx-auto text-gray-400 opacity-50" />
-                      <h3 className="text-2xl font-bold text-white mb-4 mt-6">No lawyers found</h3>
-                      <p className="text-gray-300 mb-8 leading-relaxed">
-                        Try adjusting your search terms or filters to discover more legal experts
-                      </p>
-                      <button
-                        onClick={resetFilters}
-                        className="bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue py-3 px-8 rounded-xl font-bold transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-xl hover:scale-105"
-                      >
-                        Reset All Filters
-                      </button>
-                    </div>
+                {filteredAndSortedLawyers.map(lawyer => (
+                  <LawyerCard key={lawyer.id} lawyer={lawyer} />
+                ))}
+              </div>
+            )}
+
+            {/* No Results State */}
+            {filteredAndSortedLawyers.length === 0 && (
+              <div className="text-center py-20">
+                <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-white/20">
+                  <div className="text-gray-400 mb-6">
+                    <Filter className="w-20 h-20 mx-auto opacity-50" />
                   </div>
-                )}
+                  <h3 className="text-2xl font-bold text-white mb-4">No lawyers found</h3>
+                  <p className="text-gray-300 mb-8 leading-relaxed">
+                    Try adjusting your search terms or filters to discover more legal experts
+                  </p>
+                  <button
+                    onClick={resetFilters}
+                    className="bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue py-3 px-8 rounded-xl font-bold transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-xl hover:scale-105"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Custom Styles for Sliders */}
       <style dangerouslySetInnerHTML={{
         __html: `
         .slider::-webkit-slider-thumb {
