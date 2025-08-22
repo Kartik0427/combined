@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Scale, Phone, Mail, Plus, Trash2, Save, Edit3, DollarSign, Star, User, Calendar, BookOpen } from "lucide-react";
 import { db, auth } from "../firebase";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 const ProfilePage = ({ user, setCurrentPage }) => {
@@ -11,6 +11,22 @@ const ProfilePage = ({ user, setCurrentPage }) => {
   const [saving, setSaving] = useState(false);
   const [lawyerId, setLawyerId] = useState(null);
   const [categories, setCategories] = useState([]);
+  
+  // Predefined categories list
+  const predefinedCategories = [
+    'Matrimonial',
+    'Commercial',
+    'Consumer',
+    'Child Laws',
+    'Civil',
+    'Corporate',
+    'Labour Law',
+    'Property Rights',
+    'Cheque Bounce',
+    'Documentation',
+    'Criminal',
+    'Challans'
+  ];
   
   const [profileData, setProfileData] = useState({
     name: "",
@@ -29,6 +45,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
       year: ""
     }],
     specializations: [],
+    selectedCategories: [], // Track selected categories for editing
     rating: 0,
     reviews: 0,
     connections: 0,
@@ -69,24 +86,28 @@ const ProfilePage = ({ user, setCurrentPage }) => {
       if (lawyerDoc.exists()) {
         const data = lawyerDoc.data();
         
-        // Fetch specialization names
+        // Fetch specialization names from categories
         const specializationNames = [];
-        if (data.specializations && data.specializations.length > 0) {
-          for (const specId of data.specializations) {
-            const categoryQuery = query(
-              collection(db, "categories"),
-              where("__name__", "==", specId)
-            );
-            const categorySnapshot = await getDocs(categoryQuery);
-            if (!categorySnapshot.empty) {
-              const categoryData = categorySnapshot.docs[0].data();
-              if (categoryData.names) {
-                Object.values(categoryData.names).forEach(name => {
-                  if (!specializationNames.includes(name)) {
-                    specializationNames.push(name);
-                  }
-                });
+        const selectedCategoryIds = data.specializations || [];
+        
+        if (selectedCategoryIds.length > 0) {
+          for (const specId of selectedCategoryIds) {
+            try {
+              const categoryRef = doc(db, 'categories', specId);
+              const categoryDoc = await getDoc(categoryRef);
+              
+              if (categoryDoc.exists()) {
+                const categoryData = categoryDoc.data();
+                if (categoryData.names) {
+                  Object.values(categoryData.names).forEach(name => {
+                    if (!specializationNames.includes(name)) {
+                      specializationNames.push(name);
+                    }
+                  });
+                }
               }
+            } catch (error) {
+              console.error(`Error fetching category ${specId}:`, error);
             }
           }
         }
@@ -109,6 +130,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
           },
           education: educationData,
           specializations: specializationNames,
+          selectedCategories: specializationNames, // Initialize with current specializations
           rating: data.rating || 0,
           reviews: data.reviews || 0,
           connections: data.connections || 0,
@@ -166,13 +188,54 @@ const ProfilePage = ({ user, setCurrentPage }) => {
     }
   };
 
-  const handleSpecializationToggle = (categoryId, specializationName) => {
+  const handleCategoryToggle = (categoryName) => {
     setProfileData(prev => ({
       ...prev,
-      specializations: prev.specializations.includes(specializationName)
-        ? prev.specializations.filter(s => s !== specializationName)
-        : [...prev.specializations, specializationName]
+      selectedCategories: prev.selectedCategories.includes(categoryName)
+        ? prev.selectedCategories.filter(cat => cat !== categoryName)
+        : [...prev.selectedCategories, categoryName]
     }));
+  };
+
+  const findOrCreateCategory = async (categoryName) => {
+    // First, try to find existing category with this name
+    const categoriesRef = collection(db, 'categories');
+    const snapshot = await getDocs(categoriesRef);
+    
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      if (data.names && Object.values(data.names).includes(categoryName)) {
+        return doc.id;
+      }
+    }
+    
+    // If not found, create new category document
+    // We'll use a simple approach - create a document with the category name as both id and value
+    const categoryId = categoryName.toLowerCase().replace(/\s+/g, '_');
+    const categoryRef = doc(db, 'categories', categoryId);
+    
+    await updateDoc(categoryRef, {
+      names: {
+        0: categoryName
+      },
+      description: `Legal matters related to ${categoryName}`,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).catch(async () => {
+      // If document doesn't exist, create it
+      await setDoc(categoryRef, {
+        names: {
+          0: categoryName
+        },
+        description: `Legal matters related to ${categoryName}`,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    });
+    
+    return categoryId;
   };
 
   const handleSave = async () => {
@@ -180,17 +243,11 @@ const ProfilePage = ({ user, setCurrentPage }) => {
     
     setSaving(true);
     try {
-      // Find category IDs for selected specializations
+      // Find or create category IDs for selected specializations
       const selectedCategoryIds = [];
-      for (const category of categories) {
-        if (category.names) {
-          const hasMatchingSpec = Object.values(category.names).some(name => 
-            profileData.specializations.includes(name)
-          );
-          if (hasMatchingSpec) {
-            selectedCategoryIds.push(category.id);
-          }
-        }
+      for (const categoryName of profileData.selectedCategories) {
+        const categoryId = await findOrCreateCategory(categoryName);
+        selectedCategoryIds.push(categoryId);
       }
 
       const updateData = {
@@ -211,6 +268,12 @@ const ProfilePage = ({ user, setCurrentPage }) => {
 
       const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
       await updateDoc(lawyerRef, updateData);
+      
+      // Update the specializations in profile data for display
+      setProfileData(prev => ({
+        ...prev,
+        specializations: profileData.selectedCategories
+      }));
       
       setIsEditing(false);
       alert('Profile updated successfully!');
@@ -501,26 +564,23 @@ const ProfilePage = ({ user, setCurrentPage }) => {
           </h3>
           {isEditing ? (
             <div className="space-y-4">
-              {categories.map((category) => (
-                <div key={category.id} className="bg-white/5 rounded-xl p-4">
-                  <h4 className="text-white font-medium mb-3">Category: {category.id}</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {category.names && Object.values(category.names).map((name, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSpecializationToggle(category.id, name)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                          profileData.specializations.includes(name)
-                            ? 'bg-[#C9ADA7] text-[#22223B]'
-                            : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-                        }`}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <p className="text-white/70 text-sm mb-4">Select your areas of specialization:</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {predefinedCategories.map((categoryName) => (
+                  <label
+                    key={categoryName}
+                    className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={profileData.selectedCategories.includes(categoryName)}
+                      onChange={() => handleCategoryToggle(categoryName)}
+                      className="w-4 h-4 text-[#C9ADA7] bg-white/10 border-white/20 rounded focus:ring-[#C9ADA7] focus:ring-2"
+                    />
+                    <span className="text-white text-sm font-medium">{categoryName}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-3">
