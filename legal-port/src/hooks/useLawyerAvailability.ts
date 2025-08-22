@@ -34,6 +34,7 @@ export const useLawyerAvailability = (initialLawyers: Lawyer[] = []) => {
   }, [initialLawyers]);
 
   const handleAvailabilityUpdate = useCallback((update: LawyerAvailabilityUpdate) => {
+    console.log(`[useLawyerAvailability] Updating lawyer ${update.lawyerId} availability:`, update);
     setAvailabilityState(prev => ({
       ...prev,
       [update.lawyerId]: {
@@ -45,6 +46,7 @@ export const useLawyerAvailability = (initialLawyers: Lawyer[] = []) => {
   }, []);
 
   const handleOnlineStatus = useCallback((lawyerId: string, isOnline: boolean) => {
+    console.log(`[useLawyerAvailability] Updating lawyer ${lawyerId} online status: ${isOnline ? 'Online' : 'Offline'}`);
     setAvailabilityState(prev => ({
       ...prev,
       [lawyerId]: {

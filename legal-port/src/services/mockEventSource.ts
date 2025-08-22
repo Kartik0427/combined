@@ -16,7 +16,24 @@ class MockEventSourceServer {
   private intervalId: NodeJS.Timeout | null = null;
 
   constructor() {
+    this.initializeSampleData();
     this.startSimulation();
+  }
+
+  private initializeSampleData(): void {
+    // Initialize with some sample lawyers
+    const lawyerIds = ['gqy3IKSZIaJDQHGijuuh', 'lawyer2', 'lawyer3', 'lawyer4', 'lawyer5'];
+    lawyerIds.forEach(id => {
+      this.lawyerData[id] = {
+        availability: { 
+          audio: Math.random() > 0.5, 
+          video: Math.random() > 0.5, 
+          chat: Math.random() > 0.5 
+        },
+        isOnline: Math.random() > 0.3,
+        lastActive: new Date()
+      };
+    });
   }
 
   public addClient(callback: (data: string) => void): () => void {
@@ -34,42 +51,37 @@ class MockEventSourceServer {
   }
 
   private startSimulation(): void {
-    // Simulate random availability changes every 5-15 seconds
+    // Simulate random availability changes every 3-8 seconds
     this.intervalId = setInterval(() => {
       this.simulateAvailabilityChange();
-    }, Math.random() * 10000 + 5000);
+    }, Math.random() * 5000 + 3000);
   }
 
   private simulateAvailabilityChange(): void {
-    const lawyerIds = ['gqy3IKSZIaJDQHGijuuh', 'lawyer2', 'lawyer3', 'lawyer4', 'lawyer5'];
-    const randomLawyerId = lawyerIds[Math.floor(Math.random() * lawyerIds.length)];
-    
-    // Initialize lawyer data if not exists
-    if (!this.lawyerData[randomLawyerId]) {
-      this.lawyerData[randomLawyerId] = {
-        availability: { audio: true, video: true, chat: true },
-        isOnline: true,
-        lastActive: new Date()
-      };
-    }
+    const lawyerIds = Object.keys(this.lawyerData);
+    if (lawyerIds.length === 0) return;
 
+    const randomLawyerId = lawyerIds[Math.floor(Math.random() * lawyerIds.length)];
     const currentData = this.lawyerData[randomLawyerId];
     
     // Randomly change availability
     const changeType = Math.random();
     
-    if (changeType < 0.3) {
+    if (changeType < 0.4) {
       // Change service availability
       const services = ['audio', 'video', 'chat'] as const;
       const randomService = services[Math.floor(Math.random() * services.length)];
       currentData.availability[randomService] = !currentData.availability[randomService];
+      currentData.lastActive = new Date();
       
+      console.log(`[Mock EventSource] ${randomLawyerId} ${randomService} availability changed to ${currentData.availability[randomService]}`);
       this.broadcastAvailabilityUpdate(randomLawyerId, currentData);
-    } else if (changeType < 0.6) {
+    } else if (changeType < 0.7) {
       // Change online status
       currentData.isOnline = !currentData.isOnline;
       currentData.lastActive = new Date();
       
+      console.log(`[Mock EventSource] ${randomLawyerId} online status changed to ${currentData.isOnline}`);
       this.broadcastOnlineStatus(randomLawyerId, currentData.isOnline);
       this.broadcastAvailabilityUpdate(randomLawyerId, currentData);
     }
@@ -111,19 +123,31 @@ class MockEventSourceServer {
 // Singleton instance
 export const mockEventSourceServer = new MockEventSourceServer();
 
+// Custom EventSource implementation that extends the native interface
+interface MockEventSource extends EventSource {
+  listeners: Map<string, ((event: MessageEvent) => void)[]>;
+  unsubscribe: (() => void) | null;
+}
+
 // Mock the EventSource for demonstration
 export const createMockEventSource = (url: string): EventSource => {
-  const mockEventSource = {
-    readyState: EventSource.CONNECTING,
+  // Create a custom object that implements EventSource interface
+  const listeners = new Map<string, ((event: MessageEvent) => void)[]>();
+  let unsubscribe: (() => void) | null = null;
+  let readyState = EventSource.CONNECTING;
+
+  const mockEventSource: MockEventSource = {
+    readyState,
     url,
     withCredentials: false,
     CONNECTING: EventSource.CONNECTING,
     OPEN: EventSource.OPEN,
     CLOSED: EventSource.CLOSED,
-    onopen: null as ((event: Event) => void) | null,
-    onmessage: null as ((event: MessageEvent) => void) | null,
-    onerror: null as ((event: Event) => void) | null,
-    listeners: new Map<string, ((event: MessageEvent) => void)[]>(),
+    onopen: null,
+    onmessage: null,
+    onerror: null,
+    listeners,
+    unsubscribe,
     
     addEventListener(type: string, listener: (event: MessageEvent) => void): void {
       if (!this.listeners.has(type)) {
@@ -133,11 +157,11 @@ export const createMockEventSource = (url: string): EventSource => {
     },
     
     removeEventListener(type: string, listener: (event: MessageEvent) => void): void {
-      const listeners = this.listeners.get(type);
-      if (listeners) {
-        const index = listeners.indexOf(listener);
+      const eventListeners = this.listeners.get(type);
+      if (eventListeners) {
+        const index = eventListeners.indexOf(listener);
         if (index > -1) {
-          listeners.splice(index, 1);
+          eventListeners.splice(index, 1);
         }
       }
     },
@@ -147,18 +171,16 @@ export const createMockEventSource = (url: string): EventSource => {
     },
     
     close(): void {
-      this.readyState = EventSource.CLOSED;
+      (this as any).readyState = EventSource.CLOSED;
       if (this.unsubscribe) {
         this.unsubscribe();
       }
-    },
-    
-    unsubscribe: null as (() => void) | null
-  } as EventSource;
+    }
+  } as MockEventSource;
 
   // Simulate connection
   setTimeout(() => {
-    mockEventSource.readyState = EventSource.OPEN;
+    (mockEventSource as any).readyState = EventSource.OPEN;
     if (mockEventSource.onopen) {
       mockEventSource.onopen(new Event('open'));
     }
@@ -184,13 +206,13 @@ export const createMockEventSource = (url: string): EventSource => {
           source: window
         });
         
-        const listeners = mockEventSource.listeners.get(eventType);
-        if (listeners) {
-          listeners.forEach(listener => listener(messageEvent));
+        const eventListeners = mockEventSource.listeners.get(eventType);
+        if (eventListeners) {
+          eventListeners.forEach((listener: (event: MessageEvent) => void) => listener(messageEvent));
         }
       }
     });
   }, 100);
 
-  return mockEventSource;
+  return mockEventSource as EventSource;
 };
