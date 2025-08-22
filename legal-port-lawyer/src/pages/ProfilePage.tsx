@@ -91,6 +91,11 @@ const ProfilePage = ({ user, setCurrentPage }) => {
           }
         }
 
+        // Ensure education is always an array
+        const educationData = Array.isArray(data.education) && data.education.length > 0 
+          ? data.education 
+          : [{ degree: "", institution: "", year: "" }];
+
         setProfileData({
           name: data.name || "",
           email: data.email || "",
@@ -102,11 +107,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
             video: data.pricing?.video || 0,
             chat: data.pricing?.chat || 0
           },
-          education: data.education || [{
-            degree: "",
-            institution: "",
-            year: ""
-          }],
+          education: educationData,
           specializations: specializationNames,
           rating: data.rating || 0,
           reviews: data.reviews || 0,
@@ -142,7 +143,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
   const handleEducationChange = (index, field, value) => {
     setProfileData(prev => ({
       ...prev,
-      education: prev.education.map((edu, i) => 
+      education: (prev.education || []).map((edu, i) => 
         i === index ? { ...edu, [field]: value } : edu
       )
     }));
@@ -151,15 +152,16 @@ const ProfilePage = ({ user, setCurrentPage }) => {
   const addEducation = () => {
     setProfileData(prev => ({
       ...prev,
-      education: [...prev.education, { degree: "", institution: "", year: "" }]
+      education: [...(prev.education || []), { degree: "", institution: "", year: "" }]
     }));
   };
 
   const removeEducation = (index) => {
-    if (profileData.education.length > 1) {
+    const educationArray = profileData.education || [];
+    if (educationArray.length > 1) {
       setProfileData(prev => ({
         ...prev,
-        education: prev.education.filter((_, i) => i !== index)
+        education: (prev.education || []).filter((_, i) => i !== index)
       }));
     }
   };
@@ -202,7 +204,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
           video: Number(profileData.pricing.video),
           chat: Number(profileData.pricing.chat)
         },
-        education: profileData.education.filter(edu => edu.degree && edu.institution),
+        education: (profileData.education || []).filter(edu => edu && edu.degree && edu.institution),
         specializations: selectedCategoryIds,
         updatedAt: new Date()
       };
@@ -428,7 +430,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
             )}
           </div>
           <div className="space-y-4">
-            {profileData.education.map((edu, index) => (
+            {(profileData.education || []).map((edu, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
                   <label className="block text-white/70 text-sm font-medium mb-2">Degree</label>
@@ -478,7 +480,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
                     </div>
                   )}
                 </div>
-                {isEditing && profileData.education.length > 1 && (
+                {isEditing && (profileData.education || []).length > 1 && (
                   <button
                     onClick={() => removeEducation(index)}
                     className="p-3 bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 rounded-xl text-red-400 transition-all"
