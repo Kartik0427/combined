@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Star, MessageSquare, Phone, Video, Shield } from 'lucide-react';
 import { Lawyer } from '../services/lawyerService';
@@ -7,6 +6,23 @@ interface LawyerCardProps {
   lawyer: Lawyer;
   onSelectService: (lawyer: Lawyer, serviceType: 'audio' | 'video' | 'chat') => void;
 }
+
+// Helper function to format relative time
+const getRelativeTimeString = (date: Date): string => {
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} minutes ago`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+  } else {
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  }
+};
 
 const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onSelectService }) => {
   const getServiceButton = (serviceType: 'audio' | 'video' | 'chat', icon: React.ReactNode, label: string) => {
@@ -81,7 +97,7 @@ const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onSelectService }) => {
 
       {!lawyer.isOnline && (
         <div className="mt-4 text-center text-sm text-gray-500 bg-gray-50 py-2 px-3 rounded-lg">
-          Currently offline • Last seen {lawyer.lastActive.toRelativeTimeString()}
+          Currently offline • Last seen {getRelativeTimeString(lawyer.lastActive)}
         </div>
       )}
     </div>
