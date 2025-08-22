@@ -75,7 +75,7 @@ class EventSourceManager {
   }
 
   private handleOpen(): void {
-    console.log('[EventSource] Successfully connected to real-time updates');
+    console.log('EventSource connected');
     this.reconnectAttempts = 0;
     this.reconnectDelay = 1000;
     this.callbacks.onConnect?.();
@@ -94,20 +94,18 @@ class EventSourceManager {
     try {
       const data = JSON.parse(event.data) as LawyerAvailabilityUpdate;
       data.lastActive = new Date(data.lastActive);
-      console.log(`[EventSource] Received availability update for lawyer ${data.lawyerId}:`, data);
       this.callbacks.onAvailabilityUpdate?.(data);
     } catch (error) {
-      console.error('[EventSource] Failed to parse availability update:', error);
+      console.error('Failed to parse availability update:', error);
     }
   }
 
   private handleOnlineStatus(event: MessageEvent): void {
     try {
       const data = JSON.parse(event.data);
-      console.log(`[EventSource] Received online status update for lawyer ${data.lawyerId}: ${data.isOnline ? 'Online' : 'Offline'}`);
       this.callbacks.onLawyerOnlineStatus?.(data.lawyerId, data.isOnline);
     } catch (error) {
-      console.error('[EventSource] Failed to parse online status update:', error);
+      console.error('Failed to parse online status update:', error);
     }
   }
 
