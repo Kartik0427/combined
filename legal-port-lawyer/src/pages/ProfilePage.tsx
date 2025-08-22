@@ -195,95 +195,54 @@ const ProfilePage = ({ user, setCurrentPage }) => {
     }));
   };
 
-  const findOrCreateCategory = async (categoryName) => {
-    try {
-      // First, try to find existing category with this name
-      const categoriesRef = collection(db, 'categories');
-      const snapshot = await getDocs(categoriesRef);
-      
-      for (const doc of snapshot.docs) {
-        const data = doc.data();
-        if (data.names && Object.values(data.names).includes(categoryName)) {
-          return doc.id;
-        }
-      }
-      
-      // If not found, create new category document
-      const categoryId = categoryName.toLowerCase().replace(/\s+/g, '_');
-      const categoryRef = doc(db, 'categories', categoryId);
-      
-      // Always use setDoc to create new documents
-      await setDoc(categoryRef, {
-        names: {
-          0: categoryName
-        },
-        description: `Legal matters related to ${categoryName}`,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        lawyers: [] // Initialize empty lawyers array
-      });
-      
-      return categoryId;
-    } catch (error) {
-      console.error('Error finding or creating category:', error);
-      // Return a fallback category ID if creation fails
-      return categoryName.toLowerCase().replace(/\s+/g, '_');
-    }
-  };
+  
 
   const updateCategoriesWithLawyer = async (selectedCategories, lawyerId) => {
     try {
-      // Get all current categories to remove lawyer from ones they're no longer in
+      console.log('Updating categories for lawyer:', lawyerId, 'with specializations:', selectedCategories);
+      
+      // Get all current categories
       const categoriesRef = collection(db, 'categories');
       const snapshot = await getDocs(categoriesRef);
       
-      // Remove lawyer from all categories first
+      // Process all categories
       const updatePromises = [];
       
       for (const categoryDoc of snapshot.docs) {
         const data = categoryDoc.data();
-        if (data.lawyers && data.lawyers.includes(lawyerId)) {
-          const updatedLawyers = data.lawyers.filter(id => id !== lawyerId);
+        const categoryNames = Object.values(data.names || {});
+        const currentLawyers = data.lawyers || [];
+        const hasLawyer = currentLawyers.includes(lawyerId);
+        
+        // Check if this category should include this lawyer
+        const shouldIncludeLawyer = selectedCategories.some(selectedCat => 
+          categoryNames.includes(selectedCat)
+        );
+        
+        if (shouldIncludeLawyer && !hasLawyer) {
+          // Add lawyer to this category
+          console.log('Adding lawyer to category:', categoryDoc.id, categoryNames);
           updatePromises.push(
             updateDoc(doc(db, 'categories', categoryDoc.id), {
-              lawyers: updatedLawyers,
+              lawyers: [...currentLawyers, lawyerId],
+              updatedAt: new Date()
+            })
+          );
+        } else if (!shouldIncludeLawyer && hasLawyer) {
+          // Remove lawyer from this category
+          console.log('Removing lawyer from category:', categoryDoc.id, categoryNames);
+          updatePromises.push(
+            updateDoc(doc(db, 'categories', categoryDoc.id), {
+              lawyers: currentLawyers.filter(id => id !== lawyerId),
               updatedAt: new Date()
             })
           );
         }
       }
       
-      // Wait for all removals to complete
+      // Execute all updates
       await Promise.all(updatePromises);
-      
-      // Now add lawyer to selected categories
-      const addPromises = [];
-      
-      for (const categoryName of selectedCategories) {
-        if (categoryName && categoryName.trim()) {
-          const categoryId = await findOrCreateCategory(categoryName.trim());
-          const categoryRef = doc(db, 'categories', categoryId);
-          const categoryDoc = await getDoc(categoryRef);
-          
-          if (categoryDoc.exists()) {
-            const data = categoryDoc.data();
-            const currentLawyers = data.lawyers || [];
-            
-            if (!currentLawyers.includes(lawyerId)) {
-              addPromises.push(
-                updateDoc(categoryRef, {
-                  lawyers: [...currentLawyers, lawyerId],
-                  updatedAt: new Date()
-                })
-              );
-            }
-          }
-        }
-      }
-      
-      // Wait for all additions to complete
-      await Promise.all(addPromises);
+      console.log('Categories updated successfully');
       
     } catch (error) {
       console.error('Error updating categories with lawyer:', error);
@@ -317,7 +276,6 @@ const ProfilePage = ({ user, setCurrentPage }) => {
           edu.institution && 
           edu.institution.trim()
         ),
-        // Remove specializations from lawyer_profiles since it's now stored in categories
         updatedAt: new Date()
       };
 

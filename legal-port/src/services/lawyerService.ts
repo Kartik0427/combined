@@ -1,6 +1,6 @@
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, onSnapshot } from "firebase/firestore";
 
 export interface Lawyer {
   id: string;
@@ -40,7 +40,7 @@ const getImageUrl = async (imageUrl: string): Promise<string> => {
     try {
       const storage = getStorage();
       // Extract the path from gs://bucket-name/path
-      const path = imageUrl.replace(/^gs:\/\/[^\/]+\//, '');
+      const path = imageUrl.replace(/^gs:\/\/[^/]+\//, '');
       const storageRef = ref(storage, path);
       const downloadUrl = await getDownloadURL(storageRef);
       return downloadUrl;
