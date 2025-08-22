@@ -86,41 +86,28 @@ const ProfilePage = ({ user, setCurrentPage }) => {
       if (lawyerDoc.exists()) {
         const data = lawyerDoc.data();
         
-        // Fetch specialization names from categories
+        // Fetch specialization names from categories where this lawyer is included
         const specializationNames = [];
-        const selectedCategoryIds = data.specializations || [];
         
-        if (selectedCategoryIds.length > 0) {
-          for (const specId of selectedCategoryIds) {
-            try {
-              const categoryRef = doc(db, 'categories', specId);
-              const categoryDoc = await getDoc(categoryRef);
-              
-              if (categoryDoc.exists()) {
-                const categoryData = categoryDoc.data();
-                if (categoryData.names) {
-                  Object.values(categoryData.names).forEach(name => {
-                    if (typeof name === 'string' && !specializationNames.includes(name)) {
-                      specializationNames.push(name);
-                    }
-                  });
-                }
-              } else {
-                // If category document doesn't exist, try to infer from the ID
-                const inferredName = specId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                if (!specializationNames.includes(inferredName)) {
-                  specializationNames.push(inferredName);
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching category ${specId}:`, error);
-              // Fallback: use the category ID as name
-              const fallbackName = specId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-              if (!specializationNames.includes(fallbackName)) {
-                specializationNames.push(fallbackName);
+        try {
+          const categoriesRef = collection(db, 'categories');
+          const categoriesSnapshot = await getDocs(categoriesRef);
+          
+          categoriesSnapshot.forEach((categoryDoc) => {
+            const categoryData = categoryDoc.data();
+            // Check if this lawyer is in the lawyers array for this category
+            if (categoryData.lawyers && categoryData.lawyers.includes(uid)) {
+              if (categoryData.names) {
+                Object.values(categoryData.names).forEach(name => {
+                  if (typeof name === 'string' && !specializationNames.includes(name)) {
+                    specializationNames.push(name);
+                  }
+                });
               }
             }
-          }
+          });
+        } catch (error) {
+          console.error('Error fetching specializations from categories:', error);
         }
 
         // Ensure education is always an array
@@ -233,7 +220,8 @@ const ProfilePage = ({ user, setCurrentPage }) => {
         description: `Legal matters related to ${categoryName}`,
         isActive: true,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        lawyers: [] // Initialize empty lawyers array
       });
       
       return categoryId;
@@ -244,22 +232,72 @@ const ProfilePage = ({ user, setCurrentPage }) => {
     }
   };
 
+  const updateCategoriesWithLawyer = async (selectedCategories, lawyerId) => {
+    try {
+      // Get all current categories to remove lawyer from ones they're no longer in
+      const categoriesRef = collection(db, 'categories');
+      const snapshot = await getDocs(categoriesRef);
+      
+      // Remove lawyer from all categories first
+      const updatePromises = [];
+      
+      for (const categoryDoc of snapshot.docs) {
+        const data = categoryDoc.data();
+        if (data.lawyers && data.lawyers.includes(lawyerId)) {
+          const updatedLawyers = data.lawyers.filter(id => id !== lawyerId);
+          updatePromises.push(
+            updateDoc(doc(db, 'categories', categoryDoc.id), {
+              lawyers: updatedLawyers,
+              updatedAt: new Date()
+            })
+          );
+        }
+      }
+      
+      // Wait for all removals to complete
+      await Promise.all(updatePromises);
+      
+      // Now add lawyer to selected categories
+      const addPromises = [];
+      
+      for (const categoryName of selectedCategories) {
+        if (categoryName && categoryName.trim()) {
+          const categoryId = await findOrCreateCategory(categoryName.trim());
+          const categoryRef = doc(db, 'categories', categoryId);
+          const categoryDoc = await getDoc(categoryRef);
+          
+          if (categoryDoc.exists()) {
+            const data = categoryDoc.data();
+            const currentLawyers = data.lawyers || [];
+            
+            if (!currentLawyers.includes(lawyerId)) {
+              addPromises.push(
+                updateDoc(categoryRef, {
+                  lawyers: [...currentLawyers, lawyerId],
+                  updatedAt: new Date()
+                })
+              );
+            }
+          }
+        }
+      }
+      
+      // Wait for all additions to complete
+      await Promise.all(addPromises);
+      
+    } catch (error) {
+      console.error('Error updating categories with lawyer:', error);
+      throw error;
+    }
+  };
+
   const handleSave = async () => {
     if (!lawyerId) return;
     
     setSaving(true);
     try {
-      // Find or create category IDs for selected specializations
-      const selectedCategoryIds = [];
-      
-      if (profileData.selectedCategories && profileData.selectedCategories.length > 0) {
-        for (const categoryName of profileData.selectedCategories) {
-          if (categoryName && categoryName.trim()) {
-            const categoryId = await findOrCreateCategory(categoryName.trim());
-            selectedCategoryIds.push(categoryId);
-          }
-        }
-      }
+      // Update categories with lawyer ID
+      await updateCategoriesWithLawyer(profileData.selectedCategories || [], lawyerId);
 
       const updateData = {
         name: profileData.name || "",
@@ -279,7 +317,7 @@ const ProfilePage = ({ user, setCurrentPage }) => {
           edu.institution && 
           edu.institution.trim()
         ),
-        specializations: selectedCategoryIds,
+        // Remove specializations from lawyer_profiles since it's now stored in categories
         updatedAt: new Date()
       };
 
