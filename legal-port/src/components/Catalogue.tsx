@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin } from 'lucide-react';
+import { Star, Phone, MessageCircle, User, CheckCircle, Filter, X, ChevronDown, Search, MapPin, Mail, PhoneCall, GraduationCap } from 'lucide-react';
 import { fetchLawyers, Lawyer } from '../services/lawyerService';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 
 
@@ -16,10 +18,27 @@ interface Filters {
   sortOrder: 'asc' | 'desc';
 }
 
+interface DetailedLawyer extends Lawyer {
+  email?: string;
+  phoneNumber?: string;
+  bio?: string;
+  education?: Array<{
+    degree: string;
+    institution: string;
+    year: string;
+  }>;
+  createdAt?: Date;
+  updatedAt?: Date;
+  specializationNames?: string[];
+}
+
 const LawyerCatalogue: React.FC = () => {
   const [lawyers, setLawyers] = useState<Lawyer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedLawyer, setSelectedLawyer] = useState<DetailedLawyer | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
 
   useEffect(() => {
     const loadLawyers = async () => {
@@ -139,6 +158,72 @@ const LawyerCatalogue: React.FC = () => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const formatFirebaseDate = (date: Date | undefined): string => {
+    if (!date) return 'N/A';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const fetchDetailedLawyerData = async (lawyerId: string): Promise<DetailedLawyer | null> => {
+    try {
+      const lawyerRef = doc(db, 'lawyer_profiles', lawyerId);
+      const lawyerDoc = await getDoc(lawyerRef);
+      
+      if (!lawyerDoc.exists()) {
+        throw new Error('Lawyer not found');
+      }
+
+      const data = lawyerDoc.data();
+      const basicLawyer = lawyers.find(l => l.id === lawyerId);
+      
+      if (!basicLawyer) {
+        throw new Error('Lawyer data not found in local state');
+      }
+
+      return {
+        ...basicLawyer,
+        email: data.email || '',
+        phoneNumber: data.phoneNumber || '',
+        bio: data.bio || '',
+        education: Array.isArray(data.education) && data.education.length > 0 
+          ? data.education 
+          : [{ degree: "", institution: "", year: "" }],
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        specializationNames: basicLawyer.specializations
+      };
+    } catch (error) {
+      console.error('Error fetching detailed lawyer data:', error);
+      return null;
+    }
+  };
+
+  const openModal = async (lawyer: Lawyer) => {
+    setModalLoading(true);
+    setIsModalOpen(true);
+    
+    const detailedData = await fetchDetailedLawyerData(lawyer.id);
+    if (detailedData) {
+      setSelectedLawyer(detailedData);
+    } else {
+      setSelectedLawyer({
+        ...lawyer,
+        specializationNames: lawyer.specializations
+      });
+    }
+    setModalLoading(false);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedLawyer(null);
+  };
+
   const resetFilters = () => {
     setFilters({
       maxAudioRate: 40,
@@ -167,7 +252,10 @@ const LawyerCatalogue: React.FC = () => {
     const [selectedCallType, setSelectedCallType] = useState<'audio' | 'video' | 'chat'>('video');
 
     return (
-      <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden border border-gray-100 group">
+      <div 
+        className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden border border-gray-100 group cursor-pointer"
+        onClick={() => openModal(lawyer)}
+      >
         <div className="bg-gradient-to-br from-dark-blue via-slate-800 to-dark-blue p-4 text-white relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-3">
@@ -271,6 +359,10 @@ const LawyerCatalogue: React.FC = () => {
           <div className="grid grid-cols-2 gap-2">
             <button 
               disabled={!lawyer.availability?.[selectedCallType]}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle call logic here
+              }}
               className={`py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200 ${
                 lawyer.availability?.[selectedCallType]
                   ? 'bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue'
@@ -282,6 +374,10 @@ const LawyerCatalogue: React.FC = () => {
             </button>
             <button 
               disabled={!lawyer.availability?.chat}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle message logic here
+              }}
               className={`border py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-1 transition-all duration-200 ${
                 lawyer.availability?.chat
                   ? 'border-gray-300 hover:border-gold text-gray-700 hover:text-gold'
@@ -515,6 +611,201 @@ const LawyerCatalogue: React.FC = () => {
     </div>
   );
 
+  const LawyerModal: React.FC = () => {
+    if (!selectedLawyer) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Modal Header */}
+          <div className="bg-gradient-to-br from-dark-blue via-slate-800 to-dark-blue text-white p-6 rounded-t-2xl relative">
+            <button 
+              onClick={closeModal}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
+            
+            <div className="flex items-center gap-4">
+              {selectedLawyer.image ? (
+                <img 
+                  src={selectedLawyer.image} 
+                  alt={selectedLawyer.name}
+                  className="w-20 h-20 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-gradient-to-br from-gold to-yellow-600 rounded-xl flex items-center justify-center text-dark-blue text-3xl font-bold">
+                  {selectedLawyer.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <h2 className="text-2xl font-bold">{selectedLawyer.name}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`w-3 h-3 rounded-full ${selectedLawyer.isOnline ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                  <span className="text-gray-300">{selectedLawyer.isOnline ? 'Online' : 'Offline'}</span>
+                  {selectedLawyer.verified && (
+                    <span className="bg-gold px-2 py-1 rounded text-xs text-dark-blue font-bold">Verified Pro</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-6">
+            {modalLoading ? (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 mx-auto border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-gray-600 mt-4">Loading detailed information...</p>
+              </div>
+            ) : (
+              <>
+                {/* Contact Information */}
+                {(selectedLawyer.email || selectedLawyer.phoneNumber) && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3">Contact Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedLawyer.email && (
+                        <div className="flex items-center gap-3">
+                          <Mail className="text-gray-500" size={20} />
+                          <span>{selectedLawyer.email}</span>
+                        </div>
+                      )}
+                      {selectedLawyer.phoneNumber && (
+                        <div className="flex items-center gap-3">
+                          <Phone className="text-gray-500" size={20} />
+                          <span>{selectedLawyer.phoneNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Experience & Rating */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">Professional Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-purple-50 p-4 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-purple-600">{selectedLawyer.experience}</div>
+                      <div className="text-sm text-gray-600">Years Experience</div>
+                    </div>
+                    <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-yellow-600">{selectedLawyer.rating}</div>
+                      <div className="text-sm text-gray-600">Rating</div>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-blue-600">{selectedLawyer.reviews}</div>
+                      <div className="text-sm text-gray-600">Reviews</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Education */}
+                {selectedLawyer.education && selectedLawyer.education.length > 0 && selectedLawyer.education[0].degree && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                      <GraduationCap className="text-gray-500" size={20} />
+                      Education
+                    </h3>
+                    {selectedLawyer.education.map((edu, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg mb-2">
+                        <div className="font-semibold text-gray-800">{edu.degree.toUpperCase()}</div>
+                        <div className="text-gray-600">{edu.institution}</div>
+                        <div className="text-sm text-gray-500">Graduated: {edu.year}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Specializations */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">Specializations</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedLawyer.specializationNames || selectedLawyer.specializations || ["General Practice"]).map((spec, index) => (
+                      <span key={index} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                        {spec}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bio */}
+                {selectedLawyer.bio && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3">About</h3>
+                    <p className="text-gray-700 leading-relaxed">{selectedLawyer.bio}</p>
+                  </div>
+                )}
+
+                {/* Pricing Details */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">Consultation Rates</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className={`p-4 rounded-lg border-2 ${selectedLawyer.availability.audio ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="text-center">
+                        <div className="text-xl font-bold">₹{selectedLawyer.pricing.audio}/min</div>
+                        <div className="text-sm text-gray-600">Audio Call</div>
+                        <div className={`text-xs mt-1 ${selectedLawyer.availability.audio ? 'text-green-600' : 'text-red-600'}`}>
+                          {selectedLawyer.availability.audio ? 'Available' : 'Unavailable'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-lg border-2 ${selectedLawyer.availability.video ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="text-center">
+                        <div className="text-xl font-bold">₹{selectedLawyer.pricing.video}/min</div>
+                        <div className="text-sm text-gray-600">Video Call</div>
+                        <div className={`text-xs mt-1 ${selectedLawyer.availability.video ? 'text-green-600' : 'text-red-600'}`}>
+                          {selectedLawyer.availability.video ? 'Available' : 'Unavailable'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-lg border-2 ${selectedLawyer.availability.chat ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="text-center">
+                        <div className="text-xl font-bold">₹{selectedLawyer.pricing.chat}/min</div>
+                        <div className="text-sm text-gray-600">Chat</div>
+                        <div className={`text-xs mt-1 ${selectedLawyer.availability.chat ? 'text-green-600' : 'text-red-600'}`}>
+                          {selectedLawyer.availability.chat ? 'Available' : 'Unavailable'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Activity Information */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3">Activity</h3>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    {selectedLawyer.createdAt && (
+                      <div>Member since: {formatFirebaseDate(selectedLawyer.createdAt)}</div>
+                    )}
+                    <div>Last active: {formatFirebaseDate(selectedLawyer.lastActive)}</div>
+                    {selectedLawyer.updatedAt && (
+                      <div>Profile updated: {formatFirebaseDate(selectedLawyer.updatedAt)}</div>
+                    )}
+                    <div>Total connections: {selectedLawyer.connections}</div>
+                    <div>Lawyer ID: {selectedLawyer.id}</div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  <button className="flex-1 bg-gradient-to-r from-gold to-yellow-600 hover:from-yellow-600 hover:to-gold text-dark-blue py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-300">
+                    <PhoneCall size={18} />
+                    Call Now
+                  </button>
+                  <button className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                    <MessageCircle size={18} />
+                    Send Message
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-blue via-slate-900 to-dark-blue">
       <div className="max-w-8xl mx-auto px-6 py-12">
@@ -689,6 +980,9 @@ const LawyerCatalogue: React.FC = () => {
         }
         `
       }} />
+      
+      {/* Lawyer Detail Modal */}
+      {isModalOpen && <LawyerModal />}
     </div>
   );
 };
