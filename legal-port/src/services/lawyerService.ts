@@ -56,22 +56,17 @@ const getImageUrl = async (imageUrl: string): Promise<string> => {
 // Function to fetch specializations for a specific lawyer
 export const fetchLawyerCategories = async (lawyerId: string) => {
   try {
-    const categoriesRef = collection(db, "categories");
-    const querySnapshot = await getDocs(categoriesRef);
+    const q = query(
+      collection(db, "categories"),
+      where("id", "==", lawyerId)
+    );
+
+    const querySnapshot = await getDocs(q);
 
     let categories: string[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      // Check if this lawyer is in the lawyers array for this category
-      if (data.lawyers && data.lawyers.includes(lawyerId)) {
-        if (data.names) {
-          Object.values(data.names).forEach(name => {
-            if (typeof name === 'string' && !categories.includes(name)) {
-              categories.push(name);
-            }
-          });
-        }
-      }
+      categories = [...categories, ...data.names]; // assuming schema { id: string, names: [] }
     });
 
     return categories;
