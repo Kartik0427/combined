@@ -815,11 +815,7 @@ const LawyerCatalogue: React.FC = () => {
                       <div>Member since: {formatFirebaseDate(selectedLawyer.createdAt)}</div>
                     )}
                     <div>Last active: {formatFirebaseDate(selectedLawyer.lastActive)}</div>
-                    {selectedLawyer.updatedAt && (
-                      <div>Profile updated: {formatFirebaseDate(selectedLawyer.updatedAt)}</div>
-                    )}
                     <div>Total connections: {selectedLawyer.connections}</div>
-                    <div>Lawyer ID: {selectedLawyer.id}</div>
                   </div>
                 </div>
 
