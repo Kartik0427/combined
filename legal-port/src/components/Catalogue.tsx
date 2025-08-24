@@ -45,11 +45,33 @@ const LawyerCatalogue: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const fetchedLawyers = await fetchLawyers();
-        setLawyers(fetchedLawyers);
+        
+        // Add a timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout - please try again')), 15000);
+        });
+
+        const fetchedLawyers = await Promise.race([
+          fetchLawyers(),
+          timeoutPromise
+        ]) as Lawyer[];
+
+        if (fetchedLawyers.length === 0) {
+          setError('No lawyers available at the moment. Please try again later.');
+        } else {
+          setLawyers(fetchedLawyers);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load lawyers');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load lawyers';
+        setError(errorMessage);
         console.error('Error loading lawyers:', err);
+        
+        // Retry logic
+        setTimeout(() => {
+          if (lawyers.length === 0) {
+            loadLawyers();
+          }
+        }, 5000);
       } finally {
         setLoading(false);
       }
@@ -89,25 +111,39 @@ const LawyerCatalogue: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredAndSortedLawyers = useMemo(() => {
+    if (!lawyers || lawyers.length === 0) return [];
+
     let filtered = lawyers.filter(lawyer => {
-      const matchesSearch = lawyer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           lawyer.specializations.some(spec => spec.toLowerCase().includes(searchTerm.toLowerCase()));
+      // Early return for basic validations
+      if (!lawyer || !lawyer.name) return false;
+
+      // Optimize search matching
+      const searchLower = searchTerm.toLowerCase().trim();
+      const matchesSearch = !searchLower || 
+        lawyer.name.toLowerCase().includes(searchLower) ||
+        lawyer.specializations.some(spec => 
+          spec && spec.toLowerCase().includes(searchLower)
+        );
       
+      if (!matchesSearch) return false;
+
+      // Optimize specialization matching
       const matchesSpecialization = filters.specializations.length === 0 ||
-                                   filters.specializations.some(filterSpec => 
-                                     lawyer.specializations.some(lawyerSpec => 
-                                       lawyerSpec.toLowerCase().includes(filterSpec.toLowerCase())
-                                     )
-                                   );
+        filters.specializations.some(filterSpec => 
+          lawyer.specializations.some(lawyerSpec => 
+            lawyerSpec && lawyerSpec.toLowerCase().includes(filterSpec.toLowerCase())
+          )
+        );
       
+      if (!matchesSpecialization) return false;
+
+      // Check pricing and other filters
       return (
-        matchesSearch &&
-        matchesSpecialization &&
-        lawyer.pricing.audio <= filters.maxAudioRate &&
-        lawyer.pricing.video <= filters.maxVideoRate &&
-        lawyer.pricing.chat <= filters.maxChatRate &&
-        lawyer.rating >= filters.minRating &&
-        lawyer.experience >= filters.minExperience &&
+        (lawyer.pricing?.audio || 0) <= filters.maxAudioRate &&
+        (lawyer.pricing?.video || 0) <= filters.maxVideoRate &&
+        (lawyer.pricing?.chat || 0) <= filters.maxChatRate &&
+        (lawyer.rating || 0) >= filters.minRating &&
+        (lawyer.experience || 0) >= filters.minExperience &&
         (!filters.onlineOnly || lawyer.isOnline)
       );
     });

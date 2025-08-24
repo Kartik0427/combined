@@ -1,6 +1,6 @@
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 
 export interface Lawyer {
   id: string;
@@ -54,23 +54,37 @@ const getImageUrl = async (imageUrl: string): Promise<string> => {
 };
 
 // Function to fetch specializations for a specific lawyer
-export const fetchLawyerCategories = async (lawyerId: string) => {
+export const fetchLawyerCategories = async (lawyerId: string): Promise<string[]> => {
+  if (!lawyerId) {
+    console.warn('No lawyerId provided for fetchLawyerCategories');
+    return [];
+  }
+
   try {
     const categoriesRef = collection(db, "categories");
     const querySnapshot = await getDocs(categoriesRef);
 
-    let categories: string[] = [];
+    if (querySnapshot.empty) {
+      console.warn('No categories found in database');
+      return [];
+    }
+
+    const categories: string[] = [];
     querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      // Check if this lawyer is in the lawyers array for this category
-      if (data.lawyers && data.lawyers.includes(lawyerId)) {
-        if (data.names) {
-          Object.values(data.names).forEach(name => {
-            if (typeof name === 'string' && !categories.includes(name)) {
-              categories.push(name);
-            }
-          });
+      try {
+        const data = doc.data();
+        // Check if this lawyer is in the lawyers array for this category
+        if (data.lawyers && Array.isArray(data.lawyers) && data.lawyers.includes(lawyerId)) {
+          if (data.names && typeof data.names === 'object') {
+            Object.values(data.names).forEach(name => {
+              if (typeof name === 'string' && name.trim() && !categories.includes(name)) {
+                categories.push(name);
+              }
+            });
+          }
         }
+      } catch (docError) {
+        console.warn(`Error processing category document ${doc.id}:`, docError);
       }
     });
 
@@ -84,47 +98,91 @@ export const fetchLawyerCategories = async (lawyerId: string) => {
 export const fetchLawyers = async (): Promise<Lawyer[]> => {
   try {
     const lawyersRef = collection(db, 'lawyer_profiles');
-    const q = query(lawyersRef);
+    const q = query(lawyersRef, orderBy('rating', 'desc'), limit(100)); // Limit results for better performance
     const querySnapshot = await getDocs(q);
 
+    if (querySnapshot.empty) {
+      console.warn('No lawyers found in database');
+      return [];
+    }
+
     const lawyerPromises = querySnapshot.docs.map(async (doc) => {
-      const data = doc.data();
+      try {
+        const data = doc.data();
 
-      // Fetch categories from categories collection
-      const specializations = await fetchLawyerCategories(doc.id);
+        // Fetch categories from categories collection with error handling
+        const specializations = await fetchLawyerCategories(doc.id).catch(err => {
+          console.warn(`Failed to fetch categories for lawyer ${doc.id}:`, err);
+          return [];
+        });
 
-      // Get the proper image URL
-      const imageUrl = await getImageUrl(data.image || '');
+        // Get the proper image URL with error handling
+        const imageUrl = await getImageUrl(data.image || '').catch(err => {
+          console.warn(`Failed to get image URL for lawyer ${doc.id}:`, err);
+          return '';
+        });
 
-      return {
-        id: doc.id,
-        name: data.name || '',
-        specializations,
-        rating: data.rating || 0,
-        reviews: data.reviews || 0,
-        experience: data.experience || 0,
-        isOnline: data.isOnline || false,
-        pricing: {
-          audio: data.pricing?.audio || 0,
-          video: data.pricing?.video || 0,
-          chat: data.pricing?.chat || 0,
-        },
-        image: imageUrl,
-        connections: data.connections || 0,
-        verified: data.verified || false,
-        availability: {
-          audio: data.availability?.audio || false,
-          video: data.availability?.video || false,
-          chat: data.availability?.chat || false,
-        },
-        lastActive: data.lastActive?.toDate() || new Date(),
-      };
+        return {
+          id: doc.id,
+          name: data.name || 'Unknown',
+          specializations: specializations.length > 0 ? specializations : ['General Practice'],
+          rating: Number(data.rating) || 0,
+          reviews: Number(data.reviews) || 0,
+          experience: Number(data.experience) || 0,
+          isOnline: Boolean(data.isOnline),
+          pricing: {
+            audio: Number(data.pricing?.audio) || 0,
+            video: Number(data.pricing?.video) || 0,
+            chat: Number(data.pricing?.chat) || 0,
+          },
+          image: imageUrl,
+          connections: Number(data.connections) || 0,
+          verified: Boolean(data.verified),
+          availability: {
+            audio: Boolean(data.availability?.audio),
+            video: Boolean(data.availability?.video),
+            chat: Boolean(data.availability?.chat),
+          },
+          lastActive: data.lastActive?.toDate() || new Date(),
+        };
+      } catch (docError) {
+        console.error(`Error processing lawyer document ${doc.id}:`, docError);
+        // Return a fallback object instead of failing entirely
+        return {
+          id: doc.id,
+          name: 'Unknown',
+          specializations: ['General Practice'],
+          rating: 0,
+          reviews: 0,
+          experience: 0,
+          isOnline: false,
+          pricing: { audio: 0, video: 0, chat: 0 },
+          image: '',
+          connections: 0,
+          verified: false,
+          availability: { audio: false, video: false, chat: false },
+          lastActive: new Date(),
+        };
+      }
     });
 
-    return await Promise.all(lawyerPromises);
+    const lawyers = await Promise.allSettled(lawyerPromises);
+    
+    // Filter out failed promises and return successful ones
+    const successfulLawyers = lawyers
+      .filter((result): result is PromiseFulfilledResult<Lawyer> => result.status === 'fulfilled')
+      .map(result => result.value);
+
+    if (successfulLawyers.length === 0) {
+      throw new Error('No lawyers could be loaded successfully');
+    }
+
+    console.log(`Successfully loaded ${successfulLawyers.length} lawyers`);
+    return successfulLawyers;
+
   } catch (error) {
     console.error('Error fetching lawyers:', error);
-    throw new Error('Failed to fetch lawyers from database');
+    throw new Error(`Failed to fetch lawyers from database: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
@@ -147,43 +205,75 @@ export const subscribeLawyerAvailability = (lawyerId: string, callback: (availab
 // Real-time listener for all lawyers (for the main catalog)
 export const subscribeLawyers = (callback: (lawyers: Lawyer[]) => void) => {
   const lawyersRef = collection(db, 'lawyer_profiles');
+  const q = query(lawyersRef, orderBy('rating', 'desc'), limit(100));
 
-  return onSnapshot(lawyersRef, async (snapshot) => {
-    const lawyerPromises = snapshot.docs.map(async (doc) => {
-      const data = doc.data();
+  return onSnapshot(q, async (snapshot) => {
+    try {
+      if (snapshot.empty) {
+        console.warn('No lawyers found in real-time subscription');
+        callback([]);
+        return;
+      }
 
-      // Fetch categories from categories collection
-      const specializations = await fetchLawyerCategories(doc.id);
+      const lawyerPromises = snapshot.docs.map(async (doc) => {
+        try {
+          const data = doc.data();
 
-      // Get the proper image URL
-      const imageUrl = await getImageUrl(data.image || '');
+          // Fetch categories from categories collection with error handling
+          const specializations = await fetchLawyerCategories(doc.id).catch(err => {
+            console.warn(`Failed to fetch categories for lawyer ${doc.id}:`, err);
+            return [];
+          });
 
-      return {
-        id: doc.id,
-        name: data.name || '',
-        specializations,
-        rating: data.rating || 0,
-        reviews: data.reviews || 0,
-        experience: data.experience || 0,
-        isOnline: data.isOnline || false,
-        pricing: {
-          audio: data.pricing?.audio || 0,
-          video: data.pricing?.video || 0,
-          chat: data.pricing?.chat || 0,
-        },
-        image: imageUrl,
-        connections: data.connections || 0,
-        verified: data.verified || false,
-        availability: {
-          audio: data.availability?.audio || false,
-          video: data.availability?.video || false,
-          chat: data.availability?.chat || false,
-        },
-        lastActive: data.lastActive?.toDate() || new Date(),
-      };
-    });
+          // Get the proper image URL with error handling
+          const imageUrl = await getImageUrl(data.image || '').catch(err => {
+            console.warn(`Failed to get image URL for lawyer ${doc.id}:`, err);
+            return '';
+          });
 
-    const lawyers = await Promise.all(lawyerPromises);
-    callback(lawyers);
+          return {
+            id: doc.id,
+            name: data.name || 'Unknown',
+            specializations: specializations.length > 0 ? specializations : ['General Practice'],
+            rating: Number(data.rating) || 0,
+            reviews: Number(data.reviews) || 0,
+            experience: Number(data.experience) || 0,
+            isOnline: Boolean(data.isOnline),
+            pricing: {
+              audio: Number(data.pricing?.audio) || 0,
+              video: Number(data.pricing?.video) || 0,
+              chat: Number(data.pricing?.chat) || 0,
+            },
+            image: imageUrl,
+            connections: Number(data.connections) || 0,
+            verified: Boolean(data.verified),
+            availability: {
+              audio: Boolean(data.availability?.audio),
+              video: Boolean(data.availability?.video),
+              chat: Boolean(data.availability?.chat),
+            },
+            lastActive: data.lastActive?.toDate() || new Date(),
+          };
+        } catch (docError) {
+          console.error(`Error processing lawyer document ${doc.id} in subscription:`, docError);
+          return null;
+        }
+      });
+
+      const results = await Promise.allSettled(lawyerPromises);
+      const lawyers = results
+        .filter((result): result is PromiseFulfilledResult<Lawyer | null> => 
+          result.status === 'fulfilled' && result.value !== null
+        )
+        .map(result => result.value!);
+
+      callback(lawyers);
+    } catch (error) {
+      console.error('Error in real-time lawyers subscription:', error);
+      callback([]);
+    }
+  }, (error) => {
+    console.error('Firebase subscription error:', error);
+    callback([]);
   });
 };
